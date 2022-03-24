@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
+using drewCo.Tools;
 
-// TODO: Put this into the tools lib!
-namespace drewCo.Tools;
+namespace drewCo.WorkloadManager;
 
 // ============================================================================================================================
 /// <summary>
@@ -12,7 +12,7 @@ public class WorkloadManager<TWorkItem>
   private const double UNLIMITED = -1.0d;
 
   protected object DataLock = new object();
-  protected List<TWorkItem> RemainingWorkItems = null;
+  protected List<TWorkItem> RemainingWorkItems = null!;
 
   public int InitialItems { get; private set; }
   public int RemainingItemCount
@@ -38,7 +38,7 @@ public class WorkloadManager<TWorkItem>
   /// </summary>
   public bool RandomizeOrder { get; set; } = false;
 
-  private DateTime LastWorkItemDispatchTime = DateTime.MinValue;
+  private DateTimeOffset LastWorkItemDispatchTime = DateTimeOffset.MinValue;
 
 
   // --------------------------------------------------------------------------------------------------------------------------
@@ -119,134 +119,3 @@ public class WorkloadManager<TWorkItem>
 }
 
 
-// ============================================================================================================================
-public interface IWorkloadRunner<TWorkItem>
-{
-  void DoWork(Action<TWorkItem, WorkloadManager<TWorkItem>> workAction, Action<TWorkItem, Exception> exHandler, bool cancelOnException);
-  void Cancel();
-}
-
-
-// ============================================================================================================================
-/// <summary>
-/// Run all of the workload items sequentially (synchronously).
-/// </summary>
-public class SequentialWorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
-{
-  private WorkloadManager<TWorkItem> WorkMgr = null!;
-  private bool CancelWork = false;
-
-  // --------------------------------------------------------------------------------------------------------------------------
-  public SequentialWorkloadRunner(WorkloadManager<TWorkItem> workMgr_)
-  {
-    WorkMgr = workMgr_;
-  }
-
-  // --------------------------------------------------------------------------------------------------------------------------
-  public void DoWork(Action<TWorkItem, WorkloadManager<TWorkItem>> workAction, Action<TWorkItem, Exception> exHandler, bool cancelOnException)
-  {
-    while (!CancelWork)
-    {
-      var workRequest = WorkMgr.GetNextWorkItem();
-
-      if (CancelWork || !workRequest.IsWorkAvailable)
-      {
-        return;
-      }
-
-      try
-      {
-        workAction(workRequest.WorkItem, WorkMgr);
-      }
-      catch (Exception ex)
-      {
-        exHandler(workRequest.WorkItem, ex);
-        if (cancelOnException)
-        {
-          this.Cancel();
-        }
-      }
-    }
-  }
-
-  // --------------------------------------------------------------------------------------------------------------------------
-  public void Cancel()
-  {
-    if (!CancelWork)
-    {
-      CancelWork = true;
-    }
-  }
-}
-
-// ============================================================================================================================
-public class ThreadedWorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
-{
-  public const int UNLIMITED_THREADS = -1;
-  public int MaxThreads { get; private set; } = UNLIMITED_THREADS;
-
-  private CancellationTokenSource CancelSource = null!;
-  private WorkloadManager<TWorkItem> WorkMgr = null!;
-
-  // --------------------------------------------------------------------------------------------------------------------------
-  public ThreadedWorkloadRunner(WorkloadManager<TWorkItem> workMgr_, int maxThreads_)
-  {
-    WorkMgr = workMgr_;
-    MaxThreads = maxThreads_;
-  }
-
-  // --------------------------------------------------------------------------------------------------------------------------
-  public void DoWork(Action<TWorkItem, WorkloadManager<TWorkItem>> workAction, Action<TWorkItem, Exception> exHandler, bool cancelOnException)
-  {
-    CancelSource = new CancellationTokenSource();
-
-    List<Task> tasks = new List<Task>();
-    for (int i = 0; i < MaxThreads; i++)
-    {
-      var t = Task.Factory.StartNew(() =>
-      {
-        while (true)
-        {
-          WorkloadManager<TWorkItem>.WorkItemRequest req = WorkMgr.GetNextWorkItem();
-          if (!req.IsWorkAvailable || CancelSource.IsCancellationRequested)
-          {
-              // Done working....
-              return;
-          }
-
-          try
-          {
-            workAction.Invoke(req.WorkItem, WorkMgr);
-          }
-          catch (Exception ex)
-          {
-            exHandler(req.WorkItem, ex);
-            if (cancelOnException)
-            {
-              this.Cancel();
-            }
-          }
-        }
-
-      }, CancelSource.Token);
-      tasks.Add(t);
-    }
-
-    Console.WriteLine($"{tasks.Count} workers are now active!");
-
-    Task.WaitAll(tasks.ToArray());
-
-    Console.WriteLine("Work Complete!");
-  }
-
-
-  // --------------------------------------------------------------------------------------------------------------------------
-  /// <summary>
-  /// Cancel further work operations.
-  /// </summary>
-  public void Cancel()
-  {
-    CancelSource.Cancel();
-  }
-
-}
