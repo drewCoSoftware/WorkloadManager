@@ -112,7 +112,7 @@ public class WorkloadManager<TWorkItem>
   public record WorkItemRequest(bool IsWorkAvailable, TWorkItem WorkItem);
 
   // --------------------------------------------------------------------------------------------------------------------------
-  internal void ClearWorkRateDelay()
+  public void ClearWorkRateDelay()
   {
     LastWorkItemDispatchTime = DateTime.MinValue;
   }
