@@ -9,7 +9,8 @@ namespace drewCo.WorkloadManager;
 /// </summary>
 public class WorkloadManager<TWorkItem>
 {
-    private const double UNLIMITED = -1.0d;
+    private const double UNLIMITED_WORK_RATE = -1.0d;
+    private const int UNLIMITED_WORK_ITEMS = -1;
 
     protected object DataLock = new object();
     protected List<TWorkItem> RemainingWorkItems = null!;
@@ -30,8 +31,10 @@ public class WorkloadManager<TWorkItem>
     /// <summary>
     /// Max number of work items that can be dispatched per second.
     /// </summary>
-    public double MaxWorkRate { get; set; } = UNLIMITED;
-    public double MinWorkRate { get; set; } = UNLIMITED;
+    public double MaxWorkRate { get; set; } = UNLIMITED_WORK_RATE;
+    public double MinWorkRate { get; set; } = UNLIMITED_WORK_RATE;
+    public int MaxWorkItems { get; private set; } = UNLIMITED_WORK_ITEMS;
+    private int WorkItemsDispatched = 0;
 
     /// <summary>
     /// Randomize the order of the work items that are retrieved.
@@ -41,7 +44,7 @@ public class WorkloadManager<TWorkItem>
     {
         get
         {
-            int complete = this.TotalWorkItems - this.RemainingWorkItems.Count;
+            int complete = this.WorkItemsDispatched;
             float res = (float)complete / (float)this.TotalWorkItems;
             return res;
         }
@@ -51,10 +54,12 @@ public class WorkloadManager<TWorkItem>
 
 
     // --------------------------------------------------------------------------------------------------------------------------
-    public WorkloadManager(IList<TWorkItem> workItems)
+    public WorkloadManager(IList<TWorkItem> workItems, int maxItems = UNLIMITED_WORK_ITEMS)
     {
         RemainingWorkItems = new List<TWorkItem>(workItems);
-        TotalWorkItems = RemainingWorkItems.Count;
+        
+        MaxWorkItems = maxItems;
+        TotalWorkItems = (MaxWorkItems != UNLIMITED_WORK_ITEMS) ? MaxWorkItems : RemainingWorkItems.Count;
     }
 
     // --------------------------------------------------------------------------------------------------------------------------
@@ -68,7 +73,7 @@ public class WorkloadManager<TWorkItem>
             // --> Maybe workload manager has a concept of using cached data in general?  I kind of don't
             // like that since it piles responsibility on this class....
             // Perhaps some kind of internal loop for finer-grained sleep?
-            if (MaxWorkRate != UNLIMITED)
+            if (MaxWorkRate != UNLIMITED_WORK_RATE)
             {
                 // NOTE: RandomTools needs an overload for 'double'!!!!!
                 double frac = RandomTools.RNG.NextDouble();
@@ -86,24 +91,27 @@ public class WorkloadManager<TWorkItem>
                 }
             }
 
-
-            if (RemainingWorkItems.Count > 0)
+            bool maxItemsExceeded = (MaxWorkItems != UNLIMITED_WORK_ITEMS) && (WorkItemsDispatched >= MaxWorkItems);
+            if (RemainingWorkItems.Count > 0 && !maxItemsExceeded)
             {
-
                 int useIndex = 0;
                 if (this.RandomizeOrder)
                 {
                     useIndex = RandomTools.RNG.Next(0, RemainingWorkItems.Count - 1);
                 }
-                TWorkItem res = RemainingWorkItems[useIndex];
+                TWorkItem workItem = RemainingWorkItems[useIndex];
                 RemainingWorkItems.RemoveAt(useIndex);
 
                 LastWorkItemDispatchTime = DateTime.Now;
 
-                return new WorkItemRequest(true, res);
+                var res = new WorkItemRequest(true, workItem);
+                WorkItemsDispatched += 1;
+
+                return res;
             }
             else
             {
+                // No more work items!
                 return new WorkItemRequest(false, default(TWorkItem));
             }
         }
