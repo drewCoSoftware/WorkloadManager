@@ -31,9 +31,9 @@ public abstract class WorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
     }
 
     // NOTE: These flags can probaably be changed into some kind of state enumeration instead.
-    private bool IsComplete = false;
-    private bool WasCancelled = false;
-    private bool IsRunning = false;
+    public bool IsComplete {get; protected set; }= false;
+    public bool WasCancelled {get; protected set; }= false;
+    public bool IsRunning {get; protected set; } = false;
 
     // --------------------------------------------------------------------------------------------------------------------------
     public WorkloadRunner(WorkloadManager<TWorkItem> workMgr_)
@@ -56,6 +56,7 @@ public abstract class WorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
         _RunTime = RuntimeClock.Elapsed;
         IsComplete = true;
         WasCancelled = cancelled;
+        IsRunning = false;
     }
 
     // --------------------------------------------------------------------------------------------------------------------------
