@@ -57,7 +57,7 @@ public class WorkloadManager<TWorkItem>
     public WorkloadManager(IList<TWorkItem> workItems, int maxItems = UNLIMITED_WORK_ITEMS)
     {
         RemainingWorkItems = new List<TWorkItem>(workItems);
-        
+
         MaxWorkItems = maxItems;
         TotalWorkItems = (MaxWorkItems != UNLIMITED_WORK_ITEMS) ? MaxWorkItems : RemainingWorkItems.Count;
     }
@@ -65,35 +65,26 @@ public class WorkloadManager<TWorkItem>
     // --------------------------------------------------------------------------------------------------------------------------
     public WorkItemRequest GetNextWorkItem()
     {
+        // NOTE: RESEARCH:
+        // I see a way that we can accidentally report invalid number of work items or accidentally drop
+        // workers...  Consider this, we have a work function that can add more work items as they complete,
+        // a web crawler is a simple example, as we crawl each url more urls may be added.
+        // Scenario:
+        // We have 4 threads that are processing a url queue.
+        // One work item ( a url ) remains in the queue.
+        // Thread #1 removes that item and begins to work on it.
+        // Threads 2-4 each request a work item, and there is none so they stop working.
+        // #1 completes its work and adds ten work items to the queue.
+        // If 2-4 already indicated that there wasn't any work left, does that mean they stop working forever
+        // and we have essentially reduced our application to single threaded?
+
         lock (DataLock)
         {
-            // NOTE: This doesn't really work as any attempts to clear the wait externally will cause all
-            // other threads to wait for this to resolve (because we are in a locked section.).
-            // There ought to be a way to clear the delay and let other threads proceed.....'
-            // --> Maybe workload manager has a concept of using cached data in general?  I kind of don't
-            // like that since it piles responsibility on this class....
-            // Perhaps some kind of internal loop for finer-grained sleep?
-            if (MaxWorkRate != UNLIMITED_WORK_RATE)
-            {
-                // NOTE: RandomTools needs an overload for 'double'!!!!!
-                double frac = RandomTools.RNG.NextDouble();
-                double useWorkRate = (frac * (MaxWorkRate - MinWorkRate)) + MinWorkRate;
-                double delay = 1.0d / useWorkRate;
-
-                TimeSpan curWait = DateTime.Now - LastWorkItemDispatchTime;
-                if (curWait.TotalSeconds < delay)
-                {
-                    int waitFor = (int)((delay - curWait.TotalSeconds) * 1000);
-                    if (waitFor > 0)
-                    {
-                        Thread.Sleep(waitFor);
-                    }
-                }
-            }
-
             bool maxItemsExceeded = (MaxWorkItems != UNLIMITED_WORK_ITEMS) && (WorkItemsDispatched >= MaxWorkItems);
             if (RemainingWorkItems.Count > 0 && !maxItemsExceeded)
             {
+                ExecuteWorkRateDelay();
+
                 int useIndex = 0;
                 if (this.RandomizeOrder)
                 {
@@ -113,6 +104,36 @@ public class WorkloadManager<TWorkItem>
             {
                 // No more work items!
                 return new WorkItemRequest(false, default(TWorkItem));
+            }
+
+
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------------------------------------
+    private void ExecuteWorkRateDelay()
+    {
+        // NOTE: This doesn't really work as any attempts to clear the wait externally will cause all
+        // other threads to wait for this to resolve (because we are in a locked section.).
+        // There ought to be a way to clear the delay and let other threads proceed.....'
+        // --> Maybe workload manager has a concept of using cached data in general?  I kind of don't
+        // like that since it piles responsibility on this class....
+        // Perhaps some kind of internal loop for finer-grained sleep?
+        if (MaxWorkRate != UNLIMITED_WORK_RATE)
+        {
+            // NOTE: RandomTools needs an overload for 'double'!!!!!
+            double frac = RandomTools.RNG.NextDouble();
+            double useWorkRate = (frac * (MaxWorkRate - MinWorkRate)) + MinWorkRate;
+            double delay = 1.0d / useWorkRate;
+
+            TimeSpan curWait = DateTime.Now - LastWorkItemDispatchTime;
+            if (curWait.TotalSeconds < delay)
+            {
+                int waitFor = (int)((delay - curWait.TotalSeconds) * 1000);
+                if (waitFor > 0)
+                {
+                    Thread.Sleep(waitFor);
+                }
             }
         }
     }
