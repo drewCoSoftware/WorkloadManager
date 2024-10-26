@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using drewCo.Tools;
 
-namespace drewCo.WorkloadManager;
+namespace drewCo.Work;
 
 // ============================================================================================================================
 /// <summary>

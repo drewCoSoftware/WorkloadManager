@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace drewCo.WorkloadManager;
+namespace drewCo.Work;
 
 // ============================================================================================================================
 public interface IWorkloadRunner<TWorkItem>

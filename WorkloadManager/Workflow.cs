@@ -1,5 +1,5 @@
 
-namespace drewCo.WorkloadManager;
+namespace drewCo.Work;
 
 /// <summary>
 /// A workflow is used to model a set of steps that a particular task must take.  For example,
