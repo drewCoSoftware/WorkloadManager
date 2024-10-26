@@ -94,9 +94,19 @@ namespace drewCo.Work
 
 
       // All steps are now pending.
+      // We will also assign the runner + hook up the event chains.
+      JobStep prevStep = null;
       foreach (var item in JobDef.Steps)
       {
         item.State = EJobState.Pending;
+        item.JobRunner = this;
+
+        if (prevStep != null) { 
+          prevStep.OnWorkReady += item.OnWorkReadyHandler;
+          prevStep.OnStepComplete += item.OnStepCompleteHandler;
+        }
+
+        prevStep = item;
       }
 
       SetSkippedSteps(stepOps);
@@ -186,7 +196,6 @@ namespace drewCo.Work
 
         if (isSkipped)
         {
-
           var skipRes = new JobStepResult(CurrentStep);
           res.StepResults.Add(skipRes);
 
