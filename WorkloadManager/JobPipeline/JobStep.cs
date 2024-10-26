@@ -8,7 +8,7 @@ namespace drewCo.Work
     {
         private Func<int> Worker = null!;
 
-        public string Description { get; private set; }
+        public string? Description { get; private set; } = null!;
         public string Name { get; private set; }
 
         /// <summary>
@@ -28,12 +28,12 @@ namespace drewCo.Work
         }
 
         // --------------------------------------------------------------------------------------------------------------------------
-        public JobStep(string name_, string description_, Func<int> worker_)
+        public JobStep(string name_, string? description_, Func<int> worker_)
             : this(name_, description_, worker_, true)
         { }
 
         // --------------------------------------------------------------------------------------------------------------------------
-        public JobStep(string name_, string description_, Func<int> worker_, bool stopIfFailed_)
+        public JobStep(string name_, string? description_, Func<int> worker_, bool stopIfFailed_)
         {
             Name = name_;
             Worker = worker_;
@@ -51,7 +51,7 @@ namespace drewCo.Work
     }
 
     // ============================================================================================================================
-    internal class StepOptions
+    public class StepOptions
     {
         public int[] UseSteps { get; set; } = Array.Empty<int>();
     }
