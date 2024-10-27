@@ -1,48 +1,11 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using drewCo.Tools.Logging;
 
 namespace drewCo.Work
 {
-
-  // ============================================================================================================================
-  public class WorkReadyArgs : EventArgs
-  {
-  }
-
-  // ============================================================================================================================
-  public class StepCompleteArgs : EventArgs
-  {
-  }
-
-  // ============================================================================================================================
-  public class JobStepEx
-  {
-    /// <summary>
-    /// Used when a new unit of work is ready for the job runner.
-    /// </summary>
-    public EventHandler<WorkReadyArgs>? OnWorkReady;
-
-    /// <summary>
-    /// Used to signal when this step is complete.  This happens when no more units of work are ready.
-    /// Typically downstream listeners can then de-subscribe to the 'OnWorkReady' event.
-    /// </summary>
-    public EventHandler<StepCompleteArgs>? OnStepComplete;
-  }
-
-  // ============================================================================================================================
-  // Like a normal job runner, but each step can be composed of smaller units of work, and can therefore signal
-  // subsequent steps that another unit of work is ready.
-  public class JobRunnerEx
-  {
-
-    public JobRunnerEx(JobDefinition jobDef_, Logger logger_)
-    {
-
-    }
-  }
-
   // ============================================================================================================================
   /// <summary>
   /// This class will run all steps in a job definition.
@@ -85,6 +48,18 @@ namespace drewCo.Work
       return Execute(new StepOptions(), DateTimeOffset.Now);
     }
 
+    /// <summary>
+    /// This is how we will track all job steps that need to run / complete.
+    /// </summary>
+    private Dictionary<JobStep, int> JobStepsToNumber = new Dictionary<JobStep, int>();
+
+    // --------------------------------------------------------------------------------------------------------------------------
+    private void OnStepComplete(object sender, StepCompleteArgs args)
+    {
+      // Track the completed steps, and signal that we are complete when all have reported.
+      int x = 10;
+    }
+
     // --------------------------------------------------------------------------------------------------------------------------
     public JobRunResult Execute(StepOptions stepOps, DateTimeOffset timestamp)
     {
@@ -95,28 +70,19 @@ namespace drewCo.Work
 
       // All steps are now pending.
       // We will also assign the runner + hook up the event chains.
-      JobStep prevStep = null;
       foreach (var item in JobDef.Steps)
       {
         item.State = EJobState.Pending;
         item.JobRunner = this;
-
-        if (prevStep != null) { 
-          prevStep.OnWorkReady += item.OnWorkReadyHandler;
-          prevStep.OnStepComplete += item.OnStepCompleteHandler;
-        }
-
-        prevStep = item;
       }
+
 
       SetSkippedSteps(stepOps);
 
       StartTime = timestamp;
       State = EJobState.Active;
 
-
       var res = ExecuteJobSteps(StartTime);
-
 
       EndTime = res.EndTime;
       State = res.State; // ? EJobState.Success : EJobState.Failed;
@@ -161,6 +127,7 @@ namespace drewCo.Work
           var step = JobDef.Steps[i];
           if (!stepOps.UseSteps.Contains(i + 1))
           {
+            throw new NotSupportedException("Step skipping is not allowed at this time!");
             step.State = EJobState.Skipped;
           }
         }
@@ -223,6 +190,9 @@ namespace drewCo.Work
           TimeSpan elapsed = sw.Elapsed;
           stepRes.EndTime = startTime + elapsed;
           startTime = stepRes.EndTime;
+
+          // Raise the step complete event.
+          item.OnStepComplete?.Invoke(item, new StepCompleteArgs(stepRes));
 
           res.StepResults.Add(stepRes);
 

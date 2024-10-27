@@ -4,13 +4,8 @@ using System.Collections.Generic;
 namespace drewCo.Work
 {
   // ===========================================================================================================================
-  // TODO: Some way for the job steps to have sub-steps / signal work availability?
   public class JobStep : IJobInfo
   {
-    /// <summary>
-    /// Used when a new unit of work is ready for the job runner.
-    /// </summary>
-    public EventHandler<WorkReadyArgs>? OnWorkReady;
 
     /// <summary>
     /// Used to signal when this step is complete.  This happens when no more units of work are ready.
@@ -55,33 +50,11 @@ namespace drewCo.Work
       StopIfFailed = stopIfFailed_;
     }
 
-    /// <summary>
-    /// Used to handle work ready events from the parent step.  Override if you need this information.
-    /// </summary>
-    public virtual void OnWorkReadyHandler(object sender, WorkReadyArgs args)
-    {
-      int x = 10;
-    }
-
-    /// <summary>
-    /// Used to handle step complete events from the parent step.  Override if you need this information.
-    /// </summary>
-    /// <param name="sender"></param>
-    /// <param name="args"></param>
-    public virtual void OnStepCompleteHandler(object sender, StepCompleteArgs args)
-    {
-      int x = 10;
-    }
-
-
 
     // --------------------------------------------------------------------------------------------------------------------------
     public int Execute()
     {
       int res = Worker();
-
-      OnStepComplete?.Invoke(this, new StepCompleteArgs());
-
       return res;
     }
 
@@ -159,6 +132,19 @@ namespace drewCo.Work
 
     public Exception? Exception { get; set; } = null;
     public string? ExceptionDetailPath { get; set; } = null;
-
   }
+
+
+  // ============================================================================================================================
+  public class StepCompleteArgs : EventArgs
+  {
+    public readonly JobStepResult WasCancelled;
+
+    // --------------------------------------------------------------------------------------------------------------------------
+    public StepCompleteArgs(JobStepResult result_)
+    {
+      WasCancelled = result_;
+    }
+  }
+
 }

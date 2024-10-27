@@ -13,10 +13,13 @@ namespace WorkTesters
     }
 
     // --------------------------------------------------------------------------------------------------------------------------
+    /// <summary>
+    /// This shows how a basic job pipeline can be setup and run.
+    /// </summary>
     [Test]
-    public void CanRunSimpleJobPipeline()
+    public void CanRunJobPipeline()
     {
-      var def = new JobDefinition($"{nameof(CanRunSimpleJobPipeline)}_Test", "A test pipeline.");
+      var def = new JobDefinition($"{nameof(CanRunJobPipeline)}_Test", "A test pipeline.");
 
       int x = 0;
       int y = 0;
