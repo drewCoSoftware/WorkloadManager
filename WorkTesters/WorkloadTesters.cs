@@ -8,12 +8,91 @@ using System.Threading.Tasks;
 namespace WorkTesters
 {
 
+  class MutliTypeWorkItem
+  {
+    public object WorkItem { get; set; } = default!;
+  }
+
   public class WorkloadTesters
   {
     // --------------------------------------------------------------------------------------------------------------------------
     [SetUp]
     public void Setup()
     { }
+
+
+    // --------------------------------------------------------------------------------------------------------------------
+    /// <summary>
+    /// This test case was provided to prototype some scenarios for non-linear jobs, in particular an AWR
+    /// processor that I was working on.
+    /// </summary>
+    [Test]
+    public void CanPrioritizeWorkItems()
+    {
+      // var workItems = new List<ThreadInterruptedException>
+      var pWorkloadManager = new PrioritizedWorkloadManager<int>();
+
+      const int STEP1_COUNT = 5;
+      const int LOW_PRIOIRTY = 2;
+      const int HIGH_PRIORITY = 1;
+
+      const int NEW_ITEMS_PER_STEP = 2;
+
+      int workItemCount = 0;
+      int lowPCount = 0;
+      int highPCount = 0;
+
+      // Here we just add some low priority work items.
+      // Our example is setup so that the low priority items generate higher priority
+      // items.  We can then show that those priorities are respected as the code executes.
+      for (int i = 0; i < STEP1_COUNT; i++)
+      {
+        pWorkloadManager.AddWorkItem(LOW_PRIOIRTY, i);
+      }
+
+
+      var runner = new SequentialWorkloadRunner<PriorityWorkItem<int>>(pWorkloadManager);
+      runner.DoWork((wi, mgr) =>
+      {
+        // NOTE: This if/then block shows how we can process work items based on their priority group.
+        // In reality, any old bit of data could be used when you need to handle different parts/steps
+        // with different methods.
+        if (wi.Priority == LOW_PRIOIRTY)
+        {
+          Assert.That(lowPCount * NEW_ITEMS_PER_STEP, Is.EqualTo(highPCount), "It appears that the priority is not being respected! [1]");
+
+          ++lowPCount;
+
+          for (int i = 0; i < NEW_ITEMS_PER_STEP; i++)
+          {
+            mgr.AddWorkItem(new PriorityWorkItem<int>(HIGH_PRIORITY, 10 + i));
+            Interlocked.Increment(ref workItemCount);
+          }
+        }
+        else
+        {
+          // Generate some higher priority work items!
+          ++highPCount;
+          Interlocked.Increment(ref workItemCount);
+
+          if (highPCount % NEW_ITEMS_PER_STEP == 0)
+          {
+            Assert.That(lowPCount, Is.EqualTo(highPCount / NEW_ITEMS_PER_STEP), "It appears that the priority is not being respected! [2]");
+          }
+        }
+      }, (wi, ex) =>
+      {
+        throw ex;
+      }, true);
+
+      // Show that everything ran correctly, and that the counts are all correct.
+      Assert.That(lowPCount, Is.EqualTo(STEP1_COUNT));
+      Assert.That(highPCount, Is.EqualTo(STEP1_COUNT * NEW_ITEMS_PER_STEP));
+
+      Assert.IsTrue(runner.IsComplete);
+      Assert.IsFalse(runner.WasCancelled);
+
+    }
 
     // --------------------------------------------------------------------------------------------------------------------------
     /// <summary>
