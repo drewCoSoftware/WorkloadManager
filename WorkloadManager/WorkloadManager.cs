@@ -1,7 +1,11 @@
 ﻿using System.Collections.Generic;
+using System.ComponentModel.Design;
 using drewCo.Tools;
 
 namespace drewCo.Work;
+
+// ============================================================================================================================
+public record WorkItemRequest<TWorkItem>(bool IsWorkAvailable, TWorkItem? WorkItem);
 
 // ============================================================================================================================
 public class PriorityWorkItem<TWorkItem>
@@ -47,7 +51,7 @@ public class PrioritizedWorkloadManager<TWorkItem> : WorkloadManager<PriorityWor
 
 
   // --------------------------------------------------------------------------------------------------------------------------
-  public override WorkItemRequest GetNextWorkItem()
+  public override WorkItemRequest<PriorityWorkItem<TWorkItem>> GetNextWorkItem()
   {
     int groupLen = PriorityNumers.Count;
 
@@ -57,15 +61,14 @@ public class PrioritizedWorkloadManager<TWorkItem> : WorkloadManager<PriorityWor
       var pGroup = PriorityGroups[PriorityNumers[i]];
       if (pGroup.AllItems.Count > 0)
       {
-        var res = pGroup.AllItems[0];
+        PriorityWorkItem<TWorkItem> res = pGroup.AllItems[0];
         pGroup.AllItems.Remove(res);
 
-
-        return new WorkItemRequest(true, res);
+        return new WorkItemRequest<PriorityWorkItem<TWorkItem>>(true, res);
       }
     }
 
-    return new WorkItemRequest(false, default);
+    return new WorkItemRequest<PriorityWorkItem<TWorkItem>>(false, default);
   }
 
   // --------------------------------------------------------------------------------------------------------------------------
@@ -103,11 +106,19 @@ public class PrioritizedWorkloadManager<TWorkItem> : WorkloadManager<PriorityWor
 
 }
 
+
+// ============================================================================================================================
+public interface IWorkloadManager<TWorkItem>
+{
+  WorkItemRequest<TWorkItem> GetNextWorkItem();
+  void AddWorkItem(TWorkItem item);
+}
+
 // ============================================================================================================================
 /// <summary>
 /// Keeps track of the units of work that still need to be done.
 /// </summary>
-public class WorkloadManager<TWorkItem>
+public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
 {
   private const double UNLIMITED_WORK_RATE = -1.0d;
   private const int UNLIMITED_WORK_ITEMS = -1;
@@ -170,7 +181,7 @@ public class WorkloadManager<TWorkItem>
   }
 
   // --------------------------------------------------------------------------------------------------------------------------
-  public virtual WorkItemRequest GetNextWorkItem()
+  public virtual WorkItemRequest<TWorkItem> GetNextWorkItem()
   {
     // NOTE: RESEARCH:
     // I see a way that we can accidentally report invalid number of work items or accidentally drop
@@ -210,7 +221,7 @@ public class WorkloadManager<TWorkItem>
 
         LastWorkItemDispatchTime = DateTime.Now;
 
-        var res = new WorkItemRequest(true, workItem);
+        var res = new WorkItemRequest<TWorkItem>(true, workItem);
         WorkItemsDispatched += 1;
 
         return res;
@@ -218,7 +229,7 @@ public class WorkloadManager<TWorkItem>
       else
       {
         // No more work items!
-        return new WorkItemRequest(false, default(TWorkItem));
+        return new WorkItemRequest<TWorkItem>(false, default(TWorkItem));
       }
 
 
@@ -263,13 +274,13 @@ public class WorkloadManager<TWorkItem>
     }
   }
 
-  public record WorkItemRequest(bool IsWorkAvailable, TWorkItem? WorkItem);
 
   // --------------------------------------------------------------------------------------------------------------------------
   public void ClearWorkRateDelay()
   {
     LastWorkItemDispatchTime = DateTime.MinValue;
   }
+
 }
 
 

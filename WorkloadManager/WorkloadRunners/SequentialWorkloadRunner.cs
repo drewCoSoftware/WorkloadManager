@@ -6,31 +6,41 @@ namespace drewCo.Work;
 /// </summary>
 public class SequentialWorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
 {
-  private WorkloadManager<TWorkItem> WorkMgr = null!;
+  private IWorkloadManager<TWorkItem> WorkMgr = null!;
   private bool CancelWork = false;
 
+
+  public bool IsComplete { get; private set; }
+  public bool WasCancelled { get; private set; }
+  public bool IsRunning { get; private set; }
+
   // --------------------------------------------------------------------------------------------------------------------------
-  public SequentialWorkloadRunner(WorkloadManager<TWorkItem> workMgr_)
+  public SequentialWorkloadRunner(IWorkloadManager<TWorkItem> workMgr_)
   {
     WorkMgr = workMgr_;
   }
 
+
   // --------------------------------------------------------------------------------------------------------------------------
-  public void DoWork(Action<TWorkItem, WorkloadManager<TWorkItem>> workAction, Action<TWorkItem, Exception> exHandler, bool cancelOnException)
+  public void DoWork(Action<TWorkItem, IWorkloadManager<TWorkItem>> workAction, Action<TWorkItem, Exception> exHandler, bool cancelOnException)
   {
+
+    IsRunning = true;
     while (!CancelWork)
     {
       var workRequest = WorkMgr.GetNextWorkItem();
 
       if (CancelWork || !workRequest.IsWorkAvailable)
       {
+        IsRunning = false;
+        WasCancelled = false;
+        IsComplete = true;
         return;
       }
 
       try
       {
-        
-      workAction(workRequest.WorkItem, WorkMgr);
+        workAction(workRequest.WorkItem, WorkMgr);
       }
       catch (Exception ex)
       {
@@ -49,6 +59,9 @@ public class SequentialWorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
     if (!CancelWork)
     {
       CancelWork = true;
+      WasCancelled = true;
+      IsRunning = false;
+      IsComplete = false;
     }
   }
 }
