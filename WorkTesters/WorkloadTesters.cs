@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -29,8 +30,9 @@ namespace WorkTesters
     [Test]
     public void CanPrioritizeWorkItems()
     {
+
       // var workItems = new List<ThreadInterruptedException>
-      var pWorkloadManager = new PrioritizedWorkloadManager<int>();
+      var pWorkloadManager = new PrioritizedWorkloadManager<TestPrioityItem>();
 
       const int STEP1_COUNT = 5;
       const int LOW_PRIOIRTY = 2;
@@ -47,11 +49,11 @@ namespace WorkTesters
       // items.  We can then show that those priorities are respected as the code executes.
       for (int i = 0; i < STEP1_COUNT; i++)
       {
-        pWorkloadManager.AddWorkItem(LOW_PRIOIRTY, i);
+        pWorkloadManager.AddWorkItem(new TestPrioityItem(LOW_PRIOIRTY));
       }
 
 
-      var runner = new SequentialWorkloadRunner<PriorityWorkItem<int>>(pWorkloadManager);
+      var runner = new SequentialWorkloadRunner<TestPrioityItem>(pWorkloadManager);
       runner.DoWork((wi, mgr) =>
       {
         // NOTE: This if/then block shows how we can process work items based on their priority group.
@@ -65,7 +67,7 @@ namespace WorkTesters
 
           for (int i = 0; i < NEW_ITEMS_PER_STEP; i++)
           {
-            mgr.AddWorkItem(new PriorityWorkItem<int>(HIGH_PRIORITY, 10 + i));
+            mgr.AddWorkItem(new TestPrioityItem(HIGH_PRIORITY));
             Interlocked.Increment(ref workItemCount);
           }
         }
@@ -136,9 +138,19 @@ namespace WorkTesters
 
   }
 
-
-  class WorkItem
+  // ==============================================================================================================================
+  class TestPrioityItem : IHasPriority
   {
+    public TestPrioityItem(int priority_)
+    {
+      Priority = priority_;
+    }
+
+    public int Priority { get; private set; }
   }
+
+  // ==============================================================================================================================
+  class WorkItem
+  {  }
 
 }
