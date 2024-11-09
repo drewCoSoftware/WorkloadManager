@@ -106,12 +106,20 @@ public class PrioritizedWorkloadManager<TWorkItem> : WorkloadManager<PriorityWor
 
 }
 
+// ============================================================================================================================
+public interface IWorkloadData
+{
+  int TotalWorkItems { get; }
+  int RemainingItemCount { get; }
+  float PercentComplete { get; }
+}
 
 // ============================================================================================================================
-public interface IWorkloadManager<TWorkItem>
+public interface IWorkloadManager<TWorkItem> : IWorkloadData
 {
   WorkItemRequest<TWorkItem> GetNextWorkItem();
   void AddWorkItem(TWorkItem item);
+  void ClearWorkRateDelay();
 }
 
 // ============================================================================================================================
@@ -151,7 +159,7 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
   /// Randomize the order of the work items that are retrieved.
   /// </summary>
   public bool RandomizeOrder { get; set; } = false;
-  public float PercentCompelte
+  public float PercentComplete
   {
     get
     {
