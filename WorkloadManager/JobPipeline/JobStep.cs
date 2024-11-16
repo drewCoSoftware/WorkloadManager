@@ -60,10 +60,18 @@ namespace drewCo.Work
 
   }
 
+  //// ============================================================================================================================
+  // LEGACY: This version is overkill.
+  //public class StepOptions
+  //{
+  //  public int[] UseSteps { get; set; } = Array.Empty<int>();
+  //}
+
   // ============================================================================================================================
   public class StepOptions
   {
-    public int[] UseSteps { get; set; } = Array.Empty<int>();
+    public int StartStep { get; set; } = 1;
+    public int EndStep { get; set; } = int.MaxValue;
   }
 
   // ============================================================================================================================

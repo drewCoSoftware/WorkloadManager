@@ -12,7 +12,15 @@ namespace drewCo.Work
   /// </summary>
   public class JobRunner : IJobInfo
   {
+    /// <summary>
+    /// Standard timespan format.
+    /// </summary>
     public const string TIMESPAN_FORMAT = "hh':'mm':'ss";
+
+    /// <summary>
+    /// Standard timespan format, including milliseconds.
+    /// </summary>
+    public const string TIMESPAN_FORMAT_MS = "hh':'mm':'ss\\.fff";
 
     public const int CODE_OK = 0;
     public const int CODE_GENERAL_FAIL = -1;
@@ -76,7 +84,6 @@ namespace drewCo.Work
         item.JobRunner = this;
       }
 
-
       SetSkippedSteps(stepOps);
 
       StartTime = timestamp;
@@ -90,6 +97,7 @@ namespace drewCo.Work
       if (res.State == EJobState.Success)
       {
         Logger.Info("Job completed successfully!");
+        Logger.Info($"Total runtime was: {res.TotalTime.ToString(TIMESPAN_FORMAT_MS)}");
       }
       else
       {
@@ -104,34 +112,45 @@ namespace drewCo.Work
     private void ValidateOptions(StepOptions stepOps)
     {
       int totalSteps = JobDef.Steps.Count;
-      if (stepOps.UseSteps?.Length > 0)
-      {
-        foreach (var stepNumber in stepOps.UseSteps)
-        {
-          if (stepNumber < 1 || stepNumber > totalSteps)
-          {
-            throw new InvalidOperationException($"Invalid start step!  Must be between 1 and {totalSteps} for this job!");
-          }
-        }
+      if (stepOps.StartStep < 1) { stepOps.StartStep = 1; }
+      if (stepOps.EndStep > totalSteps) { 
+        stepOps.EndStep = totalSteps;
       }
+
+      //if (stepOps.UseSteps?.Length > 0)
+      //{
+      //  foreach (var stepNumber in stepOps.UseSteps)
+      //  {
+      //    if (stepNumber < 1 || stepNumber > totalSteps)
+      //    {
+      //      throw new InvalidOperationException($"Invalid start step!  Must be between 1 and {totalSteps} for this job!");
+      //    }
+      //  }
+      //}
     }
 
     // --------------------------------------------------------------------------------------------------------------------------
     private void SetSkippedSteps(StepOptions stepOps)
     {
-      if (stepOps.UseSteps?.Length > 0)
+      for (int i = 0; i < JobDef.Steps.Count; i++)
       {
-        int totalSteps = JobDef.Steps.Count;
-        for (int i = 0; i < totalSteps; i++)
-        {
-          var step = JobDef.Steps[i];
-          if (!stepOps.UseSteps.Contains(i + 1))
-          {
-            throw new NotSupportedException("Step skipping is not allowed at this time!");
-            step.State = EJobState.Skipped;
-          }
-        }
+        int stepNumber = i + 1;
+        if (stepNumber >= stepOps.StartStep  && stepNumber <= stepOps.EndStep) { continue; }
+        JobDef.Steps[i].State = EJobState.Skipped;
       }
+      //if (stepOps.UseSteps?.Length > 0)
+      //{
+      //  int totalSteps = JobDef.Steps.Count;
+      //  for (int i = 0; i < totalSteps; i++)
+      //  {
+      //    var step = JobDef.Steps[i];
+      //    if (!stepOps.UseSteps.Contains(i + 1))
+      //    {
+      //      throw new NotSupportedException("Step skipping is not allowed at this time!");
+      //      step.State = EJobState.Skipped;
+      //    }
+      //  }
+      //}
 
     }
 
