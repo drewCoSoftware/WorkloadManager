@@ -15,7 +15,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="drewCo.Tools" Version="1.3.3.6" />
+    <EditorConfigFiles Include=".editorconfig" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="drewCo.Tools" Version="1.4.0.6" />
   </ItemGroup>
 
 </Project>
