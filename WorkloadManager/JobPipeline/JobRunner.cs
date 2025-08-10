@@ -54,18 +54,24 @@ namespace drewCo.Work
       var step = lastStep_;
       while (step != null)
       {
+        step.State = EJobState.Pending;
         steps.Insert(0, step);
         step = step.Previous;
       }
+      int count = steps.Count;
+      for (int i = 0; i < count; i++)
+      {
+        steps[i].StepNumber = i + 1;
+      }
 
-      AllSteps = AllSteps.ToArray();
+      
+      AllSteps = steps.ToArray();
     }
 
     // ------------------------------------------------------------------------------------------
     public JobRunResultEx Execute(StepOptions stepOps, DateTimeOffset timestamp)
     {
       ValidateOptions(stepOps);
-
 
       Log.Info($"Starting job: {this.JobName} on step:{stepOps.StartStep}");
 
@@ -78,7 +84,7 @@ namespace drewCo.Work
       JobRunResultEx res = ExecuteSteps(timestamp);
 
       EndTime = res.EndTime;
-      State = res.State; // ? EJobState.Success : EJobState.Failed;
+      State = res.State;
 
       if (res.State == EJobState.Success)
       {
@@ -250,6 +256,18 @@ namespace drewCo.Work
         Log.Verbose($"Fixed end step: {totalSteps}");
         stepOps.EndStep = totalSteps;
       }
+    }
+
+    // --------------------------------------------------------------------------------------------------------------------------
+    public object GetData()
+    {
+      if (this.State != EJobState.Success) { 
+        throw new InvalidOperationException("Can't report data for a non-successful pipeline!");
+      }
+
+      var last= AllSteps[AllSteps.Length-1];
+      object res=  last.GetData();
+      return res;
     }
   }
 

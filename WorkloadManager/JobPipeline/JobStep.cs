@@ -80,7 +80,7 @@ namespace drewCo.Work
 
     // *** Record Keeping Properties *** //
     EJobState State { get; set; }
-
+    int StepNumber { get; set; }
   }
 
   // ===========================================================================================================================
@@ -109,6 +109,7 @@ namespace drewCo.Work
   {
     // The current outoput data, in memory...
     protected TOut? Output = default;
+    protected bool IsOutputSet = false;
 
     protected Func<TIn, TOut> ProcessStep = null!;
 
@@ -127,6 +128,7 @@ namespace drewCo.Work
     public string Description { get; private set; } = default!;
 
     public EJobState State { get; set; } = EJobState.Invalid;
+    public int StepNumber { get; set; }
 
     // ------------------------------------------------------------------------------------------------------------------------
     /// <summary>
@@ -147,9 +149,9 @@ namespace drewCo.Work
     // ------------------------------------------------------------------------------------------------------------------------
     public object GetData()
     {
-      if (Output == null)
+      if (!IsOutputSet)
       {
-        Log.Verbose("Data is not ready... Rerunning step:");
+        Log.Verbose($"Data is not ready... Rerunning step: {this.StepNumber}");
         Output = RunStep();
       }
       return Output;
@@ -164,11 +166,10 @@ namespace drewCo.Work
         input = (TIn)Previous.GetData();
       }
 
-      TOut output = ProcessStep(input!);
+      Output = ProcessStep(input!);
+      IsOutputSet = true;
 
-
-
-      return output;
+      return Output;
     }
 
   }
