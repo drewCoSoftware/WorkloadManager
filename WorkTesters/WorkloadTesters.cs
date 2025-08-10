@@ -1,19 +1,26 @@
-﻿using drewCo.Tools.Logging;
+﻿using drewCo.CsvTools;
+using drewCo.Tools;
+using drewCo.Tools.Logging;
 using drewCo.Work;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Intrinsics.X86;
 using System.Text;
 using System.Threading.Tasks;
+using WorkloadManager.StepSerializers;
 
 namespace WorkTesters
 {
 
+  // =========================================================================================================================
   class MutliTypeWorkItem
   {
     public object WorkItem { get; set; } = default!;
   }
 
+
+  // =========================================================================================================================
   public class WorkloadTesters
   {
     // --------------------------------------------------------------------------------------------------------------------------
@@ -23,6 +30,55 @@ namespace WorkTesters
 
 
     // --------------------------------------------------------------------------------------------------------------------
+    /// <summary>
+    /// This shows that the state for each step can be saved / loaded as needed.
+    /// The purpose of this feature is so that computed data for a long-running, or expensive step can be saved instead
+    /// of having to recompute it each time the pipeline is run.
+    /// </summary>
+    [Test]
+    public void CanSaveAndLoadStateOnSteps()
+    {
+      string savePath1 = Path.Combine("step-data", nameof(CanSaveAndLoadStateOnSteps) + "_step1.csv");
+      FileTools.DeleteExistingFile(savePath1);
+
+      Assert.That(File.Exists(savePath1), Is.False);
+
+      var step1 = new JobStepEx<object, IEnumerable<int>>("compute numbers", "compute some numbers for a different step.", (input) =>
+      {
+        const int MAX = 100;
+        int[] res = new int[MAX];
+        for (int i = 0; i < MAX; i++)
+        {
+          res[i] = i * i - 1;
+        }
+
+        return res;
+      }, null, true, new EnumerabelToCSVSerializer<int>(savePath1));
+
+      var step2 = new JobStepEx<IEnumerable<int>, int>("sum numbers", "computes the sum of numbers", x =>
+      {
+        return x.Sum();
+      }, step1);
+
+
+      const int START_STEP = 2;
+      var runner = new JobRunnerEx("test", "test job", step2);
+      var result = runner.Execute(new StepOptions() { StartStep = START_STEP }, DateTimeOffset.Now);
+
+      // We should have a state file for step #1 now.
+      Assert.That(File.Exists(savePath1), Is.True, "There should be a state file for step #1!");
+
+      // ?? If we rerun this, how can we prove that it reads the file ??  Maybe a callback / event?
+      throw new InvalidOperationException("COMPLETE THIS TEST!");
+
+
+    }
+
+    // --------------------------------------------------------------------------------------------------------------------
+    /// <summary>
+    /// This test case shows that in cases where we want to start at a certain step, previous skipped steps will be re-run as needed
+    /// in order to acquire their dependent data.
+    /// </summary>
     [Test]
     public void CanRerunSkippedSteps()
     {

@@ -81,27 +81,26 @@ namespace drewCo.Work
     // *** Record Keeping Properties *** //
     EJobState State { get; set; }
     int StepNumber { get; set; }
+
+    //    bool HasStepSerializer { get; }
+    // bool LoadStepData();
+
   }
 
   // ===========================================================================================================================
-  public class StepSerializer<TOut>
+  public abstract class StepSerializer<TOut>
   {
-    // These functions are used to save/load step data so that the state of the pipeline can be preserved
-    // as it is executed.  They are optinal 
-    protected Action<TOut> SaveStepData = null!;
-    protected Func<TOut> LoadStepData = null!;
-
-    public StepSerializer(Action<TOut> saveStepData_, Func<TOut> loadStepData_)
-    {
-      SaveStepData = saveStepData_;
-      LoadStepData = loadStepData_;
-    }
+    public abstract TOut? LoadStepData();
+    public abstract bool SaveStepData(TOut data);
   }
 
   // ===========================================================================================================================
   public interface IJobStepEx<TIn, TOut>
   {
     TOut RunStep();
+
+    //TOut? LoadState();
+    //void SaveState(TOut data);
   }
 
   // ===========================================================================================================================
@@ -146,6 +145,32 @@ namespace drewCo.Work
       StepSerializer = stepSerializer_;
     }
 
+    //// ------------------------------------------------------------------------------------------------------------------------
+    //public bool HasStepSerializer
+    //{
+    //  get { return StepSerializer != null; }
+    //}
+
+    //// ------------------------------------------------------------------------------------------------------------------------
+    //public bool  LoadState()
+    //{
+    //  if (this.StepSerializer != null)
+    //  {
+    //    TOut? res = this.StepSerializer.LoadStepData();
+    //    return res;
+    //  }
+    //  return default(TOut);
+    //}
+
+    // ------------------------------------------------------------------------------------------------------------------------
+    public void SaveState(TOut state)
+    {
+      if (this.StepSerializer != null)
+      {
+        this.StepSerializer.SaveStepData(state);
+      }
+    }
+
     // ------------------------------------------------------------------------------------------------------------------------
     public object GetData()
     {
@@ -161,6 +186,20 @@ namespace drewCo.Work
     // ------------------------------------------------------------------------------------------------------------------------
     public TOut RunStep()
     {
+      if (this.StepSerializer != null)
+      {
+        Log.Verbose($"Loading previous output data for step: {this.StepNumber}...");
+        TOut? data = this.StepSerializer.LoadStepData();
+        if (data != null)
+        {
+          Log.Verbose($"Data was found, using as output.");
+
+          // TODO: Maybe we can add an event here?
+          Output = data;
+          return Output;
+        }
+      }
+
       TIn? input = default;
       if (Previous != null)
       {
@@ -169,6 +208,18 @@ namespace drewCo.Work
 
       Output = ProcessStep(input!);
       IsOutputSet = true;
+
+      if (this.StepSerializer != null)
+      {
+        Log.Verbose($"Saving data for step: {this.StepNumber}...");
+        bool saveOK = this.StepSerializer.SaveStepData(Output);
+
+        // TOOD: 'LogIf' function, or predicate based overloads?
+        // Def colors tho!
+        if (!saveOK) { 
+          Log.Warning($"Data wan not able to be saved!");
+        }
+      }
 
       return Output;
     }
@@ -293,7 +344,7 @@ namespace drewCo.Work
     /// <summary>
     /// The step was set to be skipped, but had to be run because of missing data.
     /// </summary>
-    Rerun,  
+    Rerun,
 
     /// <summary>
     /// The job/step was cancelled, probably because of a previous step failure.

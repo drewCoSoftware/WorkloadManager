@@ -139,11 +139,15 @@ namespace drewCo.Work
 
         try
         {
+          Type interfaceType = typeof(IJobStepEx<,>).MakeGenericType(CurrentStep.InputType, CurrentStep.OutputType);
+
+//          bool loadedState = CurrentStep.LoadStepData();
+
+          //if (CurrentStep.HasStepSerializer) { 
+          //}
+
           // NOTE: This is where any pre/post operations might need to happen.
           // Those should probably be callbacks in the step definition?
-          Type interfaceType = typeof(IJobStepEx<,>).MakeGenericType(CurrentStep.InputType, CurrentStep.OutputType);
-          //if (!ReflectionTools.HasInterface(CurrentStep.GetType(), interfaceType))
-
           var m = interfaceType.GetMethod("RunStep");
           if (m == null) { 
             throw new InvalidOperationException($"The current job step does not implement the interface: IJobStepEx correctly!");
