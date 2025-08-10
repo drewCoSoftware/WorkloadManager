@@ -1,36 +1,15 @@
-﻿using drewCo.Tools.Logging;
+﻿using drewCo.Tools;
+using drewCo.Tools.Logging;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 
 namespace drewCo.Work
 {
 
-  //1. _ -> b
-  //2. b -> c
-  //3. c -> d
-  //4. d -> e
 
-  //// ===========================================================================================================================
-  //public interface IJobInput<T>
-  //{
-  //  T InputData { get; }
-  //}
-
-  //// ===========================================================================================================================
-  //public interface IJobOutput<T>
-  //{
-  //  T OutputData { get; }
-  //}
-
-  // ===========================================================================================================================
-  /// <summary>
-  /// Provides data for a job step.  This is also responsible for saving/loading data in long term storage (disk, database, etc.)
-  /// </summary>
-  public interface IStepDataProvider<T>
-  {
-    T GetData();
-  }
 
   // ===========================================================================================================================
   /// <summary>
@@ -85,28 +64,88 @@ namespace drewCo.Work
   }
 
 
-
   // ===========================================================================================================================
-  public interface IJobStepEx<TIn, TOut> : IJobOutput<TOut>
-   
-   
+  public interface IJobStepEx
   {
-    IJobOutput<TIn>? Previous { get; }
+    string Name { get; }
+    string Description { get; }
+
+    Type InputType { get; }
+    Type OutputType { get; }
+
+    IJobStepEx Previous { get; }
+    object GetData();
+
+    bool StopIfFailed { get; }
+
+    // *** Record Keeping Properties *** //
+    EJobState State { get; set; }
+
   }
 
+  // ===========================================================================================================================
+  public class StepSerializer<TOut>
+  {
+    // These functions are used to save/load step data so that the state of the pipeline can be preserved
+    // as it is executed.  They are optinal 
+    protected Action<TOut> SaveStepData = null!;
+    protected Func<TOut> LoadStepData = null!;
 
+    public StepSerializer(Action<TOut> saveStepData_, Func<TOut> loadStepData_)
+    {
+      SaveStepData = saveStepData_;
+      LoadStepData = loadStepData_;
+    }
+  }
 
   // ===========================================================================================================================
-  public abstract class JobStepEx<TIn, TOut> : IJobStepEx<TIn, TOut>
+  public interface IJobStepEx<TIn, TOut>
   {
+    TOut RunStep();
+  }
 
+  // ===========================================================================================================================
+  public class JobStepEx<TIn, TOut> : IJobStepEx, IJobStepEx<TIn, TOut> //<TIn, TOut>
+  {
     // The current outoput data, in memory...
     protected TOut? Output = default;
 
-    public IJobOutput<TIn>? Previous { get; private set; } = null;
+    protected Func<TIn, TOut> ProcessStep = null!;
+
+    /// <summary>
+    /// Used to save/load state for this step.  Not always required.
+    /// </summary>
+    protected StepSerializer<TOut>? StepSerializer = null!;
+
+    public Type InputType => typeof(TIn);
+    public Type OutputType => typeof(TOut);
+
+    public IJobStepEx? Previous { get; private set; }
+    public bool StopIfFailed { get; private set; } = true;
+
+    public string Name { get; private set; } = default!;
+    public string Description { get; private set; } = default!;
+
+    public EJobState State { get; set; } = EJobState.Invalid;
 
     // ------------------------------------------------------------------------------------------------------------------------
-    public TOut GetData()
+    /// <summary>
+    /// For derived classes:
+    /// </summary>
+    protected JobStepEx() { }
+
+    // ------------------------------------------------------------------------------------------------------------------------
+    public JobStepEx(string name_, string description_, Func<TIn, TOut> processStep_, IJobStepEx previous_, bool stopIfFailed = true, StepSerializer<TOut>? stepSerializer_ = null)
+    {
+      Name = name_;
+      Description = description_;
+      Previous = previous_;
+      ProcessStep = processStep_;
+      StepSerializer = stepSerializer_;
+    }
+
+    // ------------------------------------------------------------------------------------------------------------------------
+    public object GetData()
     {
       if (Output == null)
       {
@@ -122,42 +161,17 @@ namespace drewCo.Work
       TIn? input = default;
       if (Previous != null)
       {
-        input = Previous.GetData();
+        input = (TIn)Previous.GetData();
       }
 
-      TOut output = RunStepInternal(input!);
+      TOut output = ProcessStep(input!);
+
+
+
       return output;
     }
 
-    // ------------------------------------------------------------------------------------------------------------------------
-    protected abstract TOut RunStepInternal(TIn input);
   }
-
-  // Let's good around with something.........
-  // Step 1 provides 3 numbers, and step two sums them.
-
-  // ===========================================================================================================================
-  public class Step1 : JobStepEx<object, IEnumerable<int>>
-  {
-    // ------------------------------------------------------------------------------------------------------------------------
-    protected override IEnumerable<int> RunStepInternal(object input)
-    {
-      // the input will be null, so fuck it.
-      return new[] { 1, 2, 3 };
-    }
-  }
-
-  // ===========================================================================================================================
-  public class Step2 : JobStepEx<IEnumerable<int>, int>
-  {
-    // ------------------------------------------------------------------------------------------------------------------------
-    protected override int RunStepInternal(IEnumerable<int> input)
-    {
-      int res = input.Sum();
-      return res;
-    }
-  }
-
 
 
   // ===========================================================================================================================
@@ -232,6 +246,23 @@ namespace drewCo.Work
   }
 
   // ============================================================================================================================
+  public class JobRunResultEx : IJobInfo
+  {
+    public List<JobStepResultEx> StepResults { get; set; } = new List<JobStepResultEx>();
+
+    public DateTimeOffset StartTime { get; set; }
+    public DateTimeOffset EndTime { get; set; }
+    public EJobState State { get; set; } = EJobState.Invalid;
+    public TimeSpan TotalTime
+    {
+      get { return this.EndTime - this.StartTime; }
+    }
+
+    public string? LogFilePath { get; set; } = null;
+  }
+
+  // ============================================================================================================================
+  [Obsolete("This will be replaced with: 'JobRunResultEx'")]
   public class JobRunResult : IJobInfo
   {
     public List<JobStepResult> StepResults { get; set; } = new List<JobStepResult>();
@@ -274,8 +305,35 @@ namespace drewCo.Work
 
 
 
+  // ============================================================================================================================
+  public class JobStepResultEx
+  {
+    // --------------------------------------------------------------------------------------------------------------------------
+    public JobStepResultEx(IJobStepEx step_)
+    {
+      Step = step_;
+      State = EJobState.Pending;
+    }
+
+    /// <summary>
+    /// The step that this result is associated with.
+    /// </summary>
+    public IJobStepEx Step { get; private set; }
+
+    public EJobState State { get; set; }
+
+    public DateTimeOffset StartTime { get; set; }
+    public DateTimeOffset EndTime { get; set; }
+
+    public bool Success { get { return Exception == null; } }
+
+    public Exception? Exception { get; set; } = null;
+    public string? ExceptionDetailPath { get; set; } = null;
+  }
+
 
   // ============================================================================================================================
+  [Obsolete("This will be replaced with: 'JobStepResultEx' in the future!")]
   public class JobStepResult
   {
     // --------------------------------------------------------------------------------------------------------------------------
