@@ -152,6 +152,7 @@ namespace drewCo.Work
       if (!IsOutputSet)
       {
         Log.Verbose($"Data is not ready... Rerunning step: {this.StepNumber}");
+        this.State = EJobState.Rerun;
         Output = RunStep();
       }
       return Output;
@@ -288,6 +289,11 @@ namespace drewCo.Work
     Active,
     Success,
     Failed,
+
+    /// <summary>
+    /// The step was set to be skipped, but had to be run because of missing data.
+    /// </summary>
+    Rerun,  
 
     /// <summary>
     /// The job/step was cancelled, probably because of a previous step failure.

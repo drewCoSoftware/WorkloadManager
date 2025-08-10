@@ -1,4 +1,5 @@
-﻿using drewCo.Work;
+﻿using drewCo.Tools.Logging;
+using drewCo.Work;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,6 +21,38 @@ namespace WorkTesters
     public void Setup()
     { }
 
+
+    // --------------------------------------------------------------------------------------------------------------------
+    [Test]
+    public void CanRerunSkippedSteps()
+    {
+
+      var step1 = new JobStepEx<object, IEnumerable<int>>("make numbers", "generates some numbers that should be summed up!", (input) =>
+      {
+        return new[] { 1, 2, 3 };
+      }, null);
+
+      var step2 = new JobStepEx<IEnumerable<int>, int>("sum numbers", "takes a set of numbers and computes the sum", (input) =>
+      {
+        return input.Sum();
+      }, step1);
+
+      var step3 = new JobStepEx<int, int>("make new number", "multiplies an number", (input) =>
+      {
+        return input * 3;
+      }, step2);
+
+      const int START_STEP = 3;
+      var runner = new JobRunnerEx("test", "test job", step3);
+      var result = runner.Execute(new StepOptions() { StartStep = START_STEP }, DateTimeOffset.Now);
+
+      int final = (int)runner.GetData();
+
+      Assert.That(final, Is.EqualTo(18), "Invalid result!");
+      Assert.That(step1.State, Is.EqualTo(EJobState.Rerun));
+      Assert.That(step2.State, Is.EqualTo(EJobState.Rerun));
+      Assert.That(step3.State, Is.EqualTo(EJobState.Success));
+    }
 
     // --------------------------------------------------------------------------------------------------------------------
     /// <summary>
