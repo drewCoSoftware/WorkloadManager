@@ -41,27 +41,24 @@ namespace drewCo.Work
     /// to the previous steps.
     /// </summary>
     /// <param name="lastStep_"></param>
-    public JobRunnerEx(string jobName_, string jobDescription_, IJobStepEx lastStep_)
+    public JobRunnerEx(string jobName_, string jobDescription_, IEnumerable<IJobStepEx> steps)
     {
       JobName = jobName_;
       JobDescription = jobDescription_;
 
-      var steps = new List<IJobStepEx>();
-      var step = lastStep_;
-      while (step != null)
-      {
-        step.State = EJobState.Pending;
-        steps.Insert(0, step);
-        step = step.Previous;
-      }
-      int count = steps.Count;
-      for (int i = 0; i < count; i++)
-      {
-        steps[i].StepNumber = i + 1;
-      }
-
-      
       AllSteps = steps.ToArray();
+      int len = AllSteps.Length;
+      for (int i = 0; i < len; i++)
+      {
+        var s = AllSteps[i];
+        s.StepNumber = i + 1;
+      }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    public JobRunResultEx Execute() {
+      var res = Execute(new StepOptions(), DateTimeOffset.Now); 
+      return res;
     }
 
     // ------------------------------------------------------------------------------------------
@@ -151,7 +148,8 @@ namespace drewCo.Work
           // NOTE: This is where any pre/post operations might need to happen.
           // Those should probably be callbacks in the step definition?
           var m = interfaceType.GetMethod("RunStep");
-          if (m == null) { 
+          if (m == null)
+          {
             throw new InvalidOperationException($"The current job step does not implement the interface: IJobStepEx correctly!");
           }
           m.Invoke(CurrentStep, null);
@@ -182,7 +180,7 @@ namespace drewCo.Work
 
             Log.Exception(stepRes.Exception);
 
-            stepRes.ExceptionDetailPath =  "NOT AVAILABLE!";
+            stepRes.ExceptionDetailPath = "NOT AVAILABLE!";
 
             CurrentStep.State = EJobState.Failed;
 
@@ -228,9 +226,10 @@ namespace drewCo.Work
       int index = -1;
       for (int i = 0; i < AllSteps.Length; i++)
       {
-        if (AllSteps[i] == afterStep) { 
-        index = i;
-        break;
+        if (AllSteps[i] == afterStep)
+        {
+          index = i;
+          break;
         }
       }
       index += 1;
@@ -267,12 +266,13 @@ namespace drewCo.Work
     // --------------------------------------------------------------------------------------------------------------------------
     public object GetData()
     {
-      if (this.State != EJobState.Success) { 
+      if (this.State != EJobState.Success)
+      {
         throw new InvalidOperationException("Can't report data for a non-successful pipeline!");
       }
 
-      var last= AllSteps[AllSteps.Length-1];
-      object res=  last.GetData();
+      var last = AllSteps[AllSteps.Length - 1];
+      object res = last.GetData();
       return res;
     }
   }
@@ -283,7 +283,7 @@ namespace drewCo.Work
   /// <summary>
   /// This class will run all steps in a job definition.
   /// </summary>
-  [Obsolete("This will be replaced with 'JobRunnerEx'")] 
+  [Obsolete("This will be replaced with 'JobRunnerEx'")]
   public class JobRunner : IJobInfo
   {
     /// <summary>
@@ -387,7 +387,8 @@ namespace drewCo.Work
     {
       int totalSteps = JobDef.Steps.Count;
       if (stepOps.StartStep < 1) { stepOps.StartStep = 1; }
-      if (stepOps.EndStep > totalSteps) { 
+      if (stepOps.EndStep > totalSteps)
+      {
         stepOps.EndStep = totalSteps;
       }
     }
@@ -398,7 +399,7 @@ namespace drewCo.Work
       for (int i = 0; i < JobDef.Steps.Count; i++)
       {
         int stepNumber = i + 1;
-        if (stepNumber >= stepOps.StartStep  && stepNumber <= stepOps.EndStep) { continue; }
+        if (stepNumber >= stepOps.StartStep && stepNumber <= stepOps.EndStep) { continue; }
         JobDef.Steps[i].State = EJobState.Skipped;
       }
     }

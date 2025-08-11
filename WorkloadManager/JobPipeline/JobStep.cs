@@ -107,7 +107,7 @@ namespace drewCo.Work
     public Type InputType => typeof(TIn);
     public Type OutputType => typeof(TOut);
 
-    public IJobStepEx? Previous { get; private set; }
+    public IJobStepEx? Previous { get; protected set; }
     public bool StopIfFailed { get; private set; } = true;
 
     public string Name { get; private set; } = default!;
@@ -131,7 +131,7 @@ namespace drewCo.Work
     protected JobStepEx() { }
 
     // ------------------------------------------------------------------------------------------------------------------------
-    public JobStepEx(string name_, string description_, Func<TIn, TOut> processStep_, IJobStepEx previous_, bool stopIfFailed = true, OutputSerializer<TOut>? stepSerializer_ = null)
+    public JobStepEx(string name_, string description_, IJobStepEx previous_, Func<TIn, TOut> processStep_, bool stopIfFailed = true, OutputSerializer<TOut>? stepSerializer_ = null)
     {
       Name = name_;
       Description = description_;
@@ -169,7 +169,7 @@ namespace drewCo.Work
     }
 
     // ------------------------------------------------------------------------------------------------------------------------
-    public TOut RunStep()
+    public  TOut RunStep()
     {
       var cached = LoadOutputData();
       if (cached.HasData)
@@ -189,7 +189,7 @@ namespace drewCo.Work
         input = (TIn)Previous.GetData();
       }
 
-      Output = ProcessStep(input!);
+      Output = ProcessStep.Invoke(input!); //  (input!);
       IsOutputSet = true;
 
       if (this.OutputSerializer != null)
