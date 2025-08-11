@@ -81,10 +81,6 @@ namespace WorkTesters
         var result = runner.Execute(new StepOptions() { StartStep = START_STEP }, DateTimeOffset.Now);
         Assert.That(step1LoadCount, Is.EqualTo(1), "Data for step 1 should have been loaded!");
       }
-
-      // throw new InvalidOperationException("COMPLETE THIS TEST!");
-      // Assert.That(step1LoadCount, Is.EqualTo(0), "Data for step 1 should not have been loaded!");
-
     }
 
     // --------------------------------------------------------------------------------------------------------------------

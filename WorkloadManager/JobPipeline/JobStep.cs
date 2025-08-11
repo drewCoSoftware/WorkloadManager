@@ -34,23 +34,6 @@ namespace drewCo.Work
 
   }
 
-
-  // data, and how it is provisioned can take many forms.....
-  // do we expect a list of stuff?  A single object, etc.?
-  // Lists of things are nice because their content can be streamed......
-  // Just using streams is a pain because they are pretty abstract.....
-  // --> But I guess that is where the stream readers/writings come into play....
-  // if you are going to abstract stuff like job steps, then you should expect some extra overhead to
-  // deal with those abstractions....
-  // In reality, it is just up to the previous step to provide the data that you request....
-  // in the case of something like the data grabber, we pull a bunch of tables, and compose their content into dictionaries.
-  // this is its own web of dependencies, but highlights that for a certain step we might expect some partial amount of data?
-  // // --> This is an interesting thought, but maybe too complex.... it seems like we are asking for there to be a single
-  // manager of data that can provide content based on previous runs, but that would be a real furball......
-  // 
-  // What we are actually proposing is a stepwise process that can go to a previous step is the currently requested step doesn't
-  // have what it needs.
-
   // ===========================================================================================================================
   public interface IJobOutput<TOut>
   {
@@ -303,13 +286,6 @@ namespace drewCo.Work
     }
 
   }
-
-  //// ============================================================================================================================
-  // LEGACY: This version is overkill.
-  //public class StepOptions
-  //{
-  //  public int[] UseSteps { get; set; } = Array.Empty<int>();
-  //}
 
   // ============================================================================================================================
   public class StepOptions
