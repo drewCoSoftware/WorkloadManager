@@ -55,7 +55,7 @@ namespace WorkTesters
 
         return res;
       }, null, true, new EnumerabelToCSVSerializer<int>(savePath1));
-      step1.OnStepDataLoaded += (s, e) =>
+      step1.OnOutputDataLoaded += (s, e) =>
       {
         ++step1LoadCount;
       };

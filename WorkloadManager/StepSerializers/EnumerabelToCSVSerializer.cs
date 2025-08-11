@@ -8,7 +8,7 @@ namespace WorkloadManager.StepSerializers;
   /// <summary>
   /// Saves / Loads IEnumerable instances to/from CSV files.
   /// </summary>
-  public class EnumerabelToCSVSerializer<T> : StepSerializer<IEnumerable<T>>
+  public class EnumerabelToCSVSerializer<T> : OutputSerializer<IEnumerable<T>>
   {
     /// <summary>
     /// The path that the data will be saved / loaded from.
@@ -22,7 +22,7 @@ namespace WorkloadManager.StepSerializers;
     }
 
     // --------------------------------------------------------------------------------------------------------------------------
-    public override IEnumerable<T>? LoadStepData()
+    public override IEnumerable<T>? LoadOutputData()
     {
       if (!File.Exists(SavePath))
       {
@@ -34,7 +34,7 @@ namespace WorkloadManager.StepSerializers;
     }
 
     // --------------------------------------------------------------------------------------------------------------------------
-    public override bool SaveStepData(IEnumerable<T> data)
+    public override bool SaveOutputData(IEnumerable<T> data)
     {
       string dir = Path.GetDirectoryName(SavePath);
       FileTools.CreateDirectory(dir);

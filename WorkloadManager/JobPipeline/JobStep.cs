@@ -85,10 +85,10 @@ namespace drewCo.Work
   }
 
   // ===========================================================================================================================
-  public abstract class StepSerializer<TOut>
+  public abstract class OutputSerializer<TOut>
   {
-    public abstract TOut? LoadStepData();
-    public abstract bool SaveStepData(TOut data);
+    public abstract TOut? LoadOutputData();
+    public abstract bool SaveOutputData(TOut data);
   }
 
   // ===========================================================================================================================
@@ -108,7 +108,7 @@ namespace drewCo.Work
   }
 
   // ===========================================================================================================================
-  public class JobStepEx<TIn, TOut> : IJobStepEx, IJobStepEx<TIn, TOut> //<TIn, TOut>
+  public class JobStepEx<TIn, TOut> : IJobStepEx, IJobStepEx<TIn, TOut>
   {
     // The current outoput data, in memory...
     protected TOut? Output = default;
@@ -119,7 +119,7 @@ namespace drewCo.Work
     /// <summary>
     /// Used to save/load state for this step.  Not always required.
     /// </summary>
-    protected StepSerializer<TOut>? StepSerializer = null!;
+    protected OutputSerializer<TOut>? OutputSerializer = null!;
 
     public Type InputType => typeof(TIn);
     public Type OutputType => typeof(TOut);
@@ -139,7 +139,7 @@ namespace drewCo.Work
       public TOut Data { get; set; } = default!;
     }
 
-    public EventHandler<JobStepEventArgs> OnStepDataLoaded = null!;
+    public EventHandler<JobStepEventArgs> OnOutputDataLoaded = null!;
 
     // ------------------------------------------------------------------------------------------------------------------------
     /// <summary>
@@ -148,21 +148,21 @@ namespace drewCo.Work
     protected JobStepEx() { }
 
     // ------------------------------------------------------------------------------------------------------------------------
-    public JobStepEx(string name_, string description_, Func<TIn, TOut> processStep_, IJobStepEx previous_, bool stopIfFailed = true, StepSerializer<TOut>? stepSerializer_ = null)
+    public JobStepEx(string name_, string description_, Func<TIn, TOut> processStep_, IJobStepEx previous_, bool stopIfFailed = true, OutputSerializer<TOut>? stepSerializer_ = null)
     {
       Name = name_;
       Description = description_;
       Previous = previous_;
       ProcessStep = processStep_;
-      StepSerializer = stepSerializer_;
+      OutputSerializer = stepSerializer_;
     }
 
     // ------------------------------------------------------------------------------------------------------------------------
     public void SaveState(TOut state)
     {
-      if (this.StepSerializer != null)
+      if (this.OutputSerializer != null)
       {
-        this.StepSerializer.SaveStepData(state);
+        this.OutputSerializer.SaveOutputData(state);
       }
     }
 
@@ -188,13 +188,13 @@ namespace drewCo.Work
     // ------------------------------------------------------------------------------------------------------------------------
     public TOut RunStep()
     {
-      var cached = LoadStepData();
+      var cached = LoadOutputData();
       if (cached.HasData)
       {
         Log.Verbose("Loaded step data from cache:");
         Output = cached.Data;
 
-        this.OnStepDataLoaded?.Invoke(this, new JobStepEventArgs(this));
+        this.OnOutputDataLoaded?.Invoke(this, new JobStepEventArgs(this));
 
         return Output;
       }
@@ -209,10 +209,10 @@ namespace drewCo.Work
       Output = ProcessStep(input!);
       IsOutputSet = true;
 
-      if (this.StepSerializer != null)
+      if (this.OutputSerializer != null)
       {
         Log.Verbose($"Saving data for step: {this.StepNumber}...");
-        bool saveOK = this.StepSerializer.SaveStepData(Output);
+        bool saveOK = this.OutputSerializer.SaveOutputData(Output);
 
         // TOOD: 'LogIf' function, or predicate based overloads?
         // Def colors tho!
@@ -227,14 +227,14 @@ namespace drewCo.Work
 
 
     // -----------------------------------------------------------------------------------------------
-    protected LoadDataResult LoadStepData()
+    protected LoadDataResult LoadOutputData()
     {
       LoadDataResult res = new LoadDataResult();
 
-      if (this.StepSerializer != null)
+      if (this.OutputSerializer != null)
       {
         Log.Verbose($"Loading previous output data for step: {this.StepNumber}...");
-        TOut? data = this.StepSerializer.LoadStepData();
+        TOut? data = this.OutputSerializer.LoadOutputData();
         if (data != null)
         {
           res.Data = data;
