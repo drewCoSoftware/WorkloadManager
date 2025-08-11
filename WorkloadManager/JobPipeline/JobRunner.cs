@@ -71,6 +71,7 @@ namespace drewCo.Work
     // ------------------------------------------------------------------------------------------
     public JobRunResultEx Execute(StepOptions stepOps, DateTimeOffset timestamp)
     {
+      ClearOutputs();
       ValidateOptions(stepOps);
 
       Log.Info($"Starting job: {this.JobName} on step:{stepOps.StartStep}");
@@ -98,6 +99,15 @@ namespace drewCo.Work
       }
 
       return res;
+    }
+
+    // --------------------------------------------------------------------------------------------------------------------------
+    private void ClearOutputs()
+    {
+      foreach (var s in AllSteps)
+      {
+        s.ClearOutput();
+      }
     }
 
     // --------------------------------------------------------------------------------------------------------------------------
@@ -141,10 +151,6 @@ namespace drewCo.Work
         {
           Type interfaceType = typeof(IJobStepEx<,>).MakeGenericType(CurrentStep.InputType, CurrentStep.OutputType);
 
-//          bool loadedState = CurrentStep.LoadStepData();
-
-          //if (CurrentStep.HasStepSerializer) { 
-          //}
 
           // NOTE: This is where any pre/post operations might need to happen.
           // Those should probably be callbacks in the step definition?

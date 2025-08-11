@@ -43,6 +43,7 @@ namespace WorkTesters
 
       Assert.That(File.Exists(savePath1), Is.False);
 
+      int step1LoadCount = 0;
       var step1 = new JobStepEx<object, IEnumerable<int>>("compute numbers", "compute some numbers for a different step.", (input) =>
       {
         const int MAX = 100;
@@ -54,7 +55,10 @@ namespace WorkTesters
 
         return res;
       }, null, true, new EnumerabelToCSVSerializer<int>(savePath1));
-
+      step1.OnStepDataLoaded += (s, e) =>
+      {
+        ++step1LoadCount;
+      };
       var step2 = new JobStepEx<IEnumerable<int>, int>("sum numbers", "computes the sum of numbers", x =>
       {
         return x.Sum();
@@ -62,15 +66,24 @@ namespace WorkTesters
 
 
       const int START_STEP = 2;
-      var runner = new JobRunnerEx("test", "test job", step2);
+      {
+        var runner = new JobRunnerEx("test", "test job", step2);
       var result = runner.Execute(new StepOptions() { StartStep = START_STEP }, DateTimeOffset.Now);
 
       // We should have a state file for step #1 now.
       Assert.That(File.Exists(savePath1), Is.True, "There should be a state file for step #1!");
-
+      Assert.That(step1LoadCount, Is.EqualTo(0), "Data for step 1 should not have been loaded!");
       // ?? If we rerun this, how can we prove that it reads the file ??  Maybe a callback / event?
-      throw new InvalidOperationException("COMPLETE THIS TEST!");
+      }
 
+      {
+        var runner = new JobRunnerEx("test", "test job", step2);
+        var result = runner.Execute(new StepOptions() { StartStep = START_STEP }, DateTimeOffset.Now);
+        Assert.That(step1LoadCount, Is.EqualTo(1), "Data for step 1 should have been loaded!");
+      }
+
+      // throw new InvalidOperationException("COMPLETE THIS TEST!");
+      // Assert.That(step1LoadCount, Is.EqualTo(0), "Data for step 1 should not have been loaded!");
 
     }
 
