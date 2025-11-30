@@ -42,6 +42,7 @@ public class SequentialWorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
       {
         workAction(workRequest.WorkItem, WorkMgr);
       }
+      
       catch (Exception ex)
       {
         exHandler(workRequest.WorkItem, ex);
