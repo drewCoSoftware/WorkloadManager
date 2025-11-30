@@ -8,10 +8,122 @@ namespace drewCo.Work;
 public record WorkItemRequest<TWorkItem>(bool IsWorkAvailable, TWorkItem? WorkItem);
 
 // ============================================================================================================================
+<<<<<<< HEAD
 public interface IWorkloadManager<TWorkItem>
+=======
+public class PriorityWorkItem<TWorkItem>
+{
+  /// <summary>
+  /// Items with lower priorioty numbers are executed first.
+  /// </summary>
+  public int Priority { get; private set; } = 10;
+  public TWorkItem WorkItem { get; private set; } = default!;
+
+  // --------------------------------------------------------------------------------------------------------------------------
+  public PriorityWorkItem(int priority_, TWorkItem workItem_)
+  {
+    Priority = priority_;
+    WorkItem = workItem_;
+  }
+}
+
+// ============================================================================================================================
+internal class PriorityGroup<TWorkItem>
+{
+  public int Priority { get; private set; }
+  public List<PriorityWorkItem<TWorkItem>> AllItems { get; private set; } = new List<PriorityWorkItem<TWorkItem>>();
+}
+
+// ============================================================================================================================
+public class PrioritizedWorkloadManager<TWorkItem> : WorkloadManager<PriorityWorkItem<TWorkItem>>
+{
+  // The key is the priority number.
+  private Dictionary<int, PriorityGroup<TWorkItem>> PriorityGroups { get; set; } = new Dictionary<int, PriorityGroup<TWorkItem>>();
+  private List<int> PriorityNumers = new List<int>();
+  private object GroupLock = new object();
+
+  // --------------------------------------------------------------------------------------------------------------------------
+  public PrioritizedWorkloadManager()
+    : base()
+  { }
+
+  // --------------------------------------------------------------------------------------------------------------------------
+  public PrioritizedWorkloadManager(IList<PriorityWorkItem<TWorkItem>> workItems, int maxItems = -1)
+  : base(workItems, maxItems)
+  { }
+
+
+  // --------------------------------------------------------------------------------------------------------------------------
+  public override WorkItemRequest<PriorityWorkItem<TWorkItem>> GetNextWorkItem()
+  {
+    int groupLen = PriorityNumers.Count;
+
+    // This is a very simple way to do it.  It does not take any kind of possible delay into account.
+    for (int i = 0; i < groupLen; i++)
+    {
+      var pGroup = PriorityGroups[PriorityNumers[i]];
+      if (pGroup.AllItems.Count > 0)
+      {
+        PriorityWorkItem<TWorkItem> res = pGroup.AllItems[0];
+        pGroup.AllItems.Remove(res);
+
+        return new WorkItemRequest<PriorityWorkItem<TWorkItem>>(true, res);
+      }
+    }
+
+    return new WorkItemRequest<PriorityWorkItem<TWorkItem>>(false, default);
+  }
+
+  // --------------------------------------------------------------------------------------------------------------------------
+  protected override void InitWorkItems(IList<PriorityWorkItem<TWorkItem>> workItems)
+  {
+    foreach (var item in workItems)
+    {
+      AddWorkItem(item);
+    }
+  }
+
+  // --------------------------------------------------------------------------------------------------------------------------
+  public void AddWorkItem(int priority, TWorkItem item)
+  {
+    var pwi = new PriorityWorkItem<TWorkItem>(priority, item);
+    AddWorkItem(pwi);
+  }
+  // --------------------------------------------------------------------------------------------------------------------------
+  public override void AddWorkItem(PriorityWorkItem<TWorkItem> item)
+  {
+    lock (GroupLock)
+    {
+      if (!PriorityGroups.TryGetValue(item.Priority, out var pGroup))
+      {
+        pGroup = new PriorityGroup<TWorkItem>();
+        PriorityGroups.Add(item.Priority, pGroup);
+
+        PriorityNumers.Add(item.Priority);
+        PriorityNumers.Sort();
+      }
+
+      pGroup.AllItems.Add(item);
+    }
+  }
+
+}
+
+// ============================================================================================================================
+public interface IWorkloadData
+{
+  int TotalWorkItems { get; }
+  int RemainingItemCount { get; }
+  float PercentComplete { get; }
+}
+
+// ============================================================================================================================
+public interface IWorkloadManager<TWorkItem> : IWorkloadData
+>>>>>>> 42169b2eaff729b2c3094b00b99699c4bcfb8c9a
 {
   WorkItemRequest<TWorkItem> GetNextWorkItem();
   void AddWorkItem(TWorkItem item);
+  void ClearWorkRateDelay();
 }
 
 // ============================================================================================================================
@@ -51,7 +163,7 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
   /// Randomize the order of the work items that are retrieved.
   /// </summary>
   public bool RandomizeOrder { get; set; } = false;
-  public float PercentCompelte
+  public float PercentComplete
   {
     get
     {

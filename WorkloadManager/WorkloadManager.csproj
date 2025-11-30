@@ -15,7 +15,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+<<<<<<< HEAD
     <PackageReference Include="drewCo.Tools" Version="1.3.3.6" />
+=======
+    <PackageReference Include="drewCo.CSVTools" Version="1.0.1" />
+    <PackageReference Include="drewCo.Tools" Version="1.4.0.6" />
+>>>>>>> 42169b2eaff729b2c3094b00b99699c4bcfb8c9a
   </ItemGroup>
 
 </Project>

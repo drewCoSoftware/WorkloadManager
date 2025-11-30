@@ -1,19 +1,30 @@
-﻿using drewCo.Work;
+﻿using drewCo.CsvTools;
+using drewCo.Tools;
+using drewCo.Tools.Logging;
+using drewCo.Work;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+<<<<<<< HEAD
 using System.Runtime.InteropServices;
+=======
+using System.Runtime.Intrinsics.X86;
+>>>>>>> 42169b2eaff729b2c3094b00b99699c4bcfb8c9a
 using System.Text;
 using System.Threading.Tasks;
+using WorkloadManager.StepSerializers;
 
 namespace WorkTesters
 {
 
+  // =========================================================================================================================
   class MutliTypeWorkItem
   {
     public object WorkItem { get; set; } = default!;
   }
 
+
+  // =========================================================================================================================
   public class WorkloadTesters
   {
     // --------------------------------------------------------------------------------------------------------------------------
@@ -21,6 +32,137 @@ namespace WorkTesters
     public void Setup()
     { }
 
+    // --------------------------------------------------------------------------------------------------------------------
+    /// <summary>
+    /// This test case was provided to show that subsequent steps in a job runner can use any previous
+    /// step as an input source.  The feature was added because sometime we want to run different analysis on
+    /// data that was partitioned in a different step, for example.
+    /// </summary>
+    [Test]
+    public void CanUsePreviousStepAsInputForMultipleSubsequentSteps()
+    {
+
+      var step1 = new JobStepEx<object, IEnumerable<int>>("create numbers", "makes some numbers", null, (_) =>
+      {
+        var res = new[] { 1, 2, 3, 4, 5 };
+        return res;
+      });
+
+      var addEm = new JobStepEx<IEnumerable<int>, int>("Add Numbers", "Adds a set of numbres", step1, (numbers) =>
+      {
+        int res = numbers.Sum();
+        return res;
+      });
+
+      var multEm = new JobStepEx<IEnumerable<int>, int>("Add Numbers", "Adds a set of numbres", step1, (numbers) =>
+      {
+        int res = numbers.ElementAt(0);
+        for (int i = 1; i < numbers.Count(); i++)
+        {
+          res = res * numbers.ElementAt(i);
+        }
+        return res;
+      });
+
+
+      // Well.... Now we need a way to make a step that can have multiple previous steps as input....
+      Assert.False(true, "Please finish this test!");
+
+
+      var runner = new JobRunnerEx("Numbers Test", "Test", new IJobStepEx[] { step1, addEm, multEm });
+      runner.Execute();
+
+    }
+
+    // --------------------------------------------------------------------------------------------------------------------
+    /// <summary>
+    /// This shows that the state for each step can be saved / loaded as needed.
+    /// The purpose of this feature is so that computed data for a long-running, or expensive step can be saved instead
+    /// of having to recompute it each time the pipeline is run.
+    /// </summary>
+    [Test]
+    public void CanSaveAndLoadStateOnSteps()
+    {
+      string savePath1 = Path.Combine("step-data", nameof(CanSaveAndLoadStateOnSteps) + "_step1.csv");
+      FileTools.DeleteExistingFile(savePath1);
+
+      Assert.That(File.Exists(savePath1), Is.False);
+
+      int step1LoadCount = 0;
+      var step1 = new JobStepEx<object, IEnumerable<int>>("compute numbers", "compute some numbers for a different step.", null, (input) =>
+      {
+        const int MAX = 100;
+        int[] res = new int[MAX];
+        for (int i = 0; i < MAX; i++)
+        {
+          res[i] = i * i - 1;
+        }
+
+        return res;
+      }, true, new EnumerabelToCSVSerializer<int>(savePath1));
+      step1.OnOutputDataLoaded += (s, e) =>
+      {
+        ++step1LoadCount;
+      };
+      var step2 = new JobStepEx<IEnumerable<int>, int>("sum numbers", "computes the sum of numbers", step1, x =>
+      {
+        return x.Sum();
+      });
+
+
+      const int START_STEP = 2;
+      {
+        var runner = new JobRunnerEx("test", "test job", new IJobStepEx[] { step1 , step2 });
+        var result = runner.Execute(new StepOptions() { StartStep = START_STEP }, DateTimeOffset.Now);
+
+        // We should have a state file for step #1 now.
+        Assert.That(File.Exists(savePath1), Is.True, "There should be a state file for step #1!");
+        Assert.That(step1LoadCount, Is.EqualTo(0), "Data for step 1 should not have been loaded!");
+        // ?? If we rerun this, how can we prove that it reads the file ??  Maybe a callback / event?
+      }
+
+      {
+        var runner = new JobRunnerEx("test", "test job", new IJobStepEx[] { step1, step2 });
+        var result = runner.Execute(new StepOptions() { StartStep = START_STEP }, DateTimeOffset.Now);
+        Assert.That(step1LoadCount, Is.EqualTo(1), "Data for step 1 should have been loaded!");
+      }
+    }
+
+    // --------------------------------------------------------------------------------------------------------------------
+    /// <summary>
+    /// This test case shows that in cases where we want to start at a certain step, previous skipped steps will be re-run as needed
+    /// in order to acquire their dependent data.
+    /// </summary>
+    [Test]
+    public void CanRerunSkippedSteps()
+    {
+
+      var step1 = new JobStepEx<object, IEnumerable<int>>("make numbers", "generates some numbers that should be summed up!", null, (input) =>
+      {
+        return new[] { 1, 2, 3 };
+      });
+
+      var step2 = new JobStepEx<IEnumerable<int>, int>("sum numbers", "takes a set of numbers and computes the sum", step1, (input) =>
+      {
+        return input.Sum();
+      });
+
+      var step3 = new JobStepEx<int, int>("make new number", "multiplies an number", step2, (input) =>
+      {
+        return input * 3;
+      });
+
+      const int START_STEP = 3;
+      var runner = new JobRunnerEx("test", "test job", new IJobStepEx[] { step1, step2, step3 });
+      var result = runner.Execute(new StepOptions() { StartStep = START_STEP }, DateTimeOffset.Now);
+
+      int final = (int)runner.GetData();
+
+      Assert.That(final, Is.EqualTo(18), "Invalid result!");
+      Assert.That(step1.State, Is.EqualTo(EJobState.Rerun));
+      Assert.That(step2.State, Is.EqualTo(EJobState.Rerun));
+      Assert.That(step3.State, Is.EqualTo(EJobState.Success));
+    }
 
     // --------------------------------------------------------------------------------------------------------------------
     /// <summary>

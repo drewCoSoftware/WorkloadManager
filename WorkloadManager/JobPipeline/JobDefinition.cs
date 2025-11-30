@@ -4,6 +4,7 @@ using System.Collections.Generic;
 namespace drewCo.Work
 {
   // ============================================================================================================================
+  [Obsolete("This will be removed!")]
   public class JobDefinition
   {
     public string Name { get; private set; }
