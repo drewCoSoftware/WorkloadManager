@@ -10,6 +10,9 @@ namespace drewCo.Work;
 public record WorkItemRequest<TWorkItem>(bool IsWorkAvailable, TWorkItem? WorkItem);
 
 // ============================================================================================================================
+<<<<<<< HEAD
+public interface IWorkloadManager<TWorkItem>
+=======
 public class PriorityWorkItem<TWorkItem>
 {
   /// <summary>
@@ -118,6 +121,7 @@ public interface IWorkloadData
 
 // ============================================================================================================================
 public interface IWorkloadManager<TWorkItem> : IWorkloadData
+>>>>>>> 42169b2eaff729b2c3094b00b99699c4bcfb8c9a
 {
   WorkItemRequest<TWorkItem> GetNextWorkItem();
   void AddWorkItem(TWorkItem item);
