@@ -36,18 +36,15 @@ namespace drewCo.Work
     }
 
     private JobStep? CurrentStep = null;
-    private ILogger Logger = null!;
 
     // --------------------------------------------------------------------------------------------------------------------------
-    public JobRunner(JobDefinition jobDef_, ILogger logger_)
+    public JobRunner(JobDefinition jobDef_)
     {
       JobDef = jobDef_;
       if (!JobDef.IsFrozen)
       {
         throw new InvalidOperationException("The job definition must be frozen before it can be used in a JobRunner!");
       }
-
-      Logger = logger_;
     }
 
     // --------------------------------------------------------------------------------------------------------------------------
@@ -73,7 +70,7 @@ namespace drewCo.Work
     {
       ValidateOptions(stepOps);
 
-      Logger.Info($"Starting Job: {JobDef.Name}");
+      Log.Info($"Starting Job: {JobDef.Name}");
 
 
       // All steps are now pending.
@@ -96,12 +93,12 @@ namespace drewCo.Work
 
       if (res.State == EJobState.Success)
       {
-        Logger.Info("Job completed successfully!");
-        Logger.Info($"Total runtime was: {res.TotalTime.ToString(TIMESPAN_FORMAT_MS)}");
+        Log.Info("Job completed successfully!");
+        Log.Info($"Total runtime was: {res.TotalTime.ToString(TIMESPAN_FORMAT_MS)}");
       }
       else
       {
-        Logger.Error("Job did not complete successfully!");
+        Log.Error("Job did not complete successfully!");
 
       }
 
@@ -178,7 +175,7 @@ namespace drewCo.Work
         bool isSkipped = item.State == EJobState.Skipped;
 
         string logMsg = $"Step {stepIndex}: {CurrentStep.Name}" + (isSkipped ? " [SKIPPED]" : null);
-        Logger.Info(logMsg);
+        Log.Info(logMsg);
 
         if (isSkipped)
         {
@@ -221,9 +218,8 @@ namespace drewCo.Work
           // We can even provide more information about the failure (bad return code, etc.)
           if (!stepRes.Success && CurrentStep.StopIfFailed)
           {
-            Logger.Error($"The current step: {CurrentStep.Name} failed!  All subsequent steps will be cancelled!");
-
-            stepRes.ExceptionDetailPath = Logger.LogException(stepRes.Exception);
+            Log.Error($"The current step: {CurrentStep.Name} failed!  All subsequent steps will be cancelled!");
+            // stepRes.ExceptionDetailPath = Log.Exception(stepRes.Exception);
 
             CurrentStep.State = EJobState.Failed;
 
@@ -234,12 +230,12 @@ namespace drewCo.Work
           }
 
           // TODO: Add uniform timespan formatting function to helpers + apply to all :f3 usages...
-          Logger.Info($"Step Completed in: {elapsed.ToString(TIMESPAN_FORMAT)}");
+          Log.Info($"Step Completed in: {elapsed.ToString(TIMESPAN_FORMAT)}");
         }
 
         if (cancel)
         {
-          Logger.Error("One or more steps failed and the job will be cancelled!");
+          Log.Error("One or more steps failed and the job will be cancelled!");
           break;
         }
 
