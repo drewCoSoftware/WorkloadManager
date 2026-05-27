@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel.Design;
+using System.Diagnostics;
+using System.Net;
 using drewCo.Tools;
 
 namespace drewCo.Work;
@@ -120,6 +122,9 @@ public interface IWorkloadManager<TWorkItem> : IWorkloadData
   WorkItemRequest<TWorkItem> GetNextWorkItem();
   void AddWorkItem(TWorkItem item);
   void ClearWorkRateDelay();
+  void SetComplete(TWorkItem item, Exception? ex = null);
+
+  bool HasActiveItems { get; }
 }
 
 // ============================================================================================================================
@@ -133,6 +138,14 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
 
   protected object DataLock = new object();
   protected List<TWorkItem> RemainingWorkItems = null!;
+
+  // TODO: A hashset or similar might be the way to go to speed things up!
+  protected List<TWorkItem> ActiveWorkItems = null!;
+
+  protected record class FailedWorkItem(TWorkItem Item, Exception? Exception);
+  protected List<FailedWorkItem> FailedItems = new List<FailedWorkItem>();
+
+  public bool HasActiveItems { get { return ActiveWorkItems.Count > 0; } }
 
   public int TotalWorkItems { get; private set; }
   public int RemainingItemCount
@@ -186,6 +199,7 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
   protected virtual void InitWorkItems(IList<TWorkItem> workItems)
   {
     RemainingWorkItems = new List<TWorkItem>(workItems);
+    ActiveWorkItems = new List<TWorkItem>();
   }
 
   // --------------------------------------------------------------------------------------------------------------------------
@@ -231,6 +245,7 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
 
         var res = new WorkItemRequest<TWorkItem>(true, workItem);
         WorkItemsDispatched += 1;
+        ActiveWorkItems.Add(workItem);
 
         return res;
       }
@@ -239,8 +254,17 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
         // No more work items!
         return new WorkItemRequest<TWorkItem>(false, default(TWorkItem));
       }
+    }
+  }
 
-
+  // --------------------------------------------------------------------------------------------------------------------------
+  public void SetComplete(TWorkItem item, Exception? ex = null)
+  {
+    lock (DataLock)
+    {
+      Debug.Assert(ActiveWorkItems.Contains(item), "This work item does not belong to this manager, or has already been removed!");
+      ActiveWorkItems.Remove(item);
+      FailedItems.Add(new FailedWorkItem(item, ex));
     }
   }
 
