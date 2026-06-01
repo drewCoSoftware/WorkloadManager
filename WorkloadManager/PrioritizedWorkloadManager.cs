@@ -83,14 +83,6 @@ public class PrioritizedWorkloadManager<TWorkItem> : WorkloadManager<TWorkItem>
     return new WorkItemRequest<TWorkItem>(false, default);
   }
 
-  // --------------------------------------------------------------------------------------------------------------------------
-  protected override void InitWorkItems(IList<TWorkItem> workItems)
-  {
-    foreach (var item in workItems)
-    {
-      AddWorkItem(item);
-    }
-  }
 
   // --------------------------------------------------------------------------------------------------------------------------
   protected virtual PriorityGroup<TWorkItem> CreatePriorityGroup(int priority)

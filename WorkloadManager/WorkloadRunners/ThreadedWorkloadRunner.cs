@@ -1,4 +1,6 @@
 
+using drewCo.Tools.Logging;
+
 namespace drewCo.Work;
 
 // ============================================================================================================================
@@ -34,14 +36,14 @@ public class ThreadedWorkloadRunner<TWorkItem> : WorkloadRunner<TWorkItem>
           WorkItemRequest<TWorkItem> req = WorkMgr.GetNextWorkItem();
           if (CancelSource.IsCancellationRequested)
           {
-            Console.WriteLine("Work was cancelled!");
+            Log.Info("Work was cancelled!");
             return;
           }
           else if (!req.IsWorkAvailable)
           {
             if (!WorkMgr.HasActiveItems)
             {
-              Console.WriteLine($"No work for worker: {workerId}!  Quitting!");
+              Log.Info($"No work for worker: {workerId}!  Quitting!");
               return;
             }
 
@@ -75,7 +77,7 @@ public class ThreadedWorkloadRunner<TWorkItem> : WorkloadRunner<TWorkItem>
       }, CancelSource.Token);
       tasks.Add(t);
     }
-    Console.WriteLine($"{tasks.Count} workers are now active!");
+    Log.Info($"{tasks.Count} workers are now active!");
 
     Task.WaitAll(tasks.ToArray());
 

@@ -24,8 +24,8 @@ public class SequentialWorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
   // --------------------------------------------------------------------------------------------------------------------------
   public void DoWork(Action<TWorkItem, IWorkloadManager<TWorkItem>> workAction, Action<TWorkItem, Exception> exHandler, bool cancelOnException)
   {
-
     IsRunning = true;
+
     while (!CancelWork)
     {
       var workRequest = WorkMgr.GetNextWorkItem();
