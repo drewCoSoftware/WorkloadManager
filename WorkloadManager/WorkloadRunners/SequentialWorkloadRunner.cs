@@ -5,6 +5,7 @@ namespace drewCo.Work;
 /// Run all of the workload items sequentially (synchronously).
 /// </summary>
 public class SequentialWorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
+  where TWorkItem: IWorkItem
 {
   private IWorkloadManager<TWorkItem> WorkMgr = null!;
   private bool CancelWork = false;
@@ -25,12 +26,13 @@ public class SequentialWorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
   public void DoWork(Action<TWorkItem, IWorkloadManager<TWorkItem>> workAction, Action<TWorkItem, Exception> exHandler, bool cancelOnException)
   {
     IsRunning = true;
+    bool skipWait = false;
 
     while (!CancelWork)
     {
-      var workRequest = WorkMgr.GetNextWorkItem();
+      var req = WorkMgr.GetNextWorkItem(!skipWait);
 
-      if (CancelWork || !workRequest.IsWorkAvailable)
+      if (CancelWork || !req.IsWorkAvailable)
       {
         IsRunning = false;
         WasCancelled = false;
@@ -40,12 +42,16 @@ public class SequentialWorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
 
       try
       {
-        workAction(workRequest.WorkItem, WorkMgr);
+        workAction(req.WorkItem, WorkMgr);
+        skipWait = req.WorkItem.FromCache;
+        WorkMgr.SetComplete(req.WorkItem);
       }
       
       catch (Exception ex)
       {
-        exHandler(workRequest.WorkItem, ex);
+        exHandler(req.WorkItem, ex);
+        WorkMgr.SetComplete(req.WorkItem, ex);
+
         if (cancelOnException)
         {
           this.Cancel();

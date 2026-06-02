@@ -21,7 +21,7 @@ public class PrioritizedWorkloadManager<TWorkItem> : WorkloadManager<TWorkItem>
 
 
   // --------------------------------------------------------------------------------------------------------------------------
-  public override WorkItemRequest<TWorkItem> GetNextWorkItem()
+  public override WorkItemRequest<TWorkItem> GetNextWorkItem(bool useWorkRatedDelay)
   {
     lock (GroupLock)
     {

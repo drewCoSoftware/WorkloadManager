@@ -1,10 +1,12 @@
 
 using drewCo.Tools.Logging;
+using System.Threading;
 
 namespace drewCo.Work;
 
 // ============================================================================================================================
 public class ThreadedWorkloadRunner<TWorkItem> : WorkloadRunner<TWorkItem>
+  where TWorkItem: IWorkItem
 {
   public int MaxThreads { get; private set; } = 1;
 
@@ -24,6 +26,8 @@ public class ThreadedWorkloadRunner<TWorkItem> : WorkloadRunner<TWorkItem>
 
     CancelSource = new CancellationTokenSource();
 
+    bool skipRateDelay = false;
+
     List<Task> tasks = new List<Task>();
     for (int i = 0; i < MaxThreads; i++)
     {
@@ -33,7 +37,7 @@ public class ThreadedWorkloadRunner<TWorkItem> : WorkloadRunner<TWorkItem>
 
         while (true)
         {
-          WorkItemRequest<TWorkItem> req = WorkMgr.GetNextWorkItem();
+          WorkItemRequest<TWorkItem> req = WorkMgr.GetNextWorkItem(!skipRateDelay);
           if (CancelSource.IsCancellationRequested)
           {
             Log.Info("Work was cancelled!");
@@ -50,6 +54,8 @@ public class ThreadedWorkloadRunner<TWorkItem> : WorkloadRunner<TWorkItem>
             // No work now, but other items are still in flight.  Let's wait a bit to see what happens....
             // DEBUG LOG:  NOTE: This sleep time should be the average of work items, which I'm sure workmgr can log / tell us.....
             // It can at least predict some kind of reasonable wait time I think as not all jobs may be uniform....
+            // TODO: Figure out what the actual wait time should be.
+            Log.Debug("Work is not available, but not all workers have completed....  Waiting for an arbitrary amount of time....");
             Thread.Sleep(250);
           }
           else
@@ -58,6 +64,7 @@ public class ThreadedWorkloadRunner<TWorkItem> : WorkloadRunner<TWorkItem>
             try
             {
               workAction.Invoke(req.WorkItem, WorkMgr);
+              skipRateDelay = req.WorkItem.FromCache;
 
               WorkMgr.SetComplete(req.WorkItem);
             }

@@ -120,7 +120,7 @@ public interface IWorkloadData
 public interface IWorkloadManager<TWorkItem> : IWorkloadData
 {
   /// <param name="ignoreWorkRateDelay">Set to true to ignore workrate delays.  This is typically used to bypass those delays when the previous work item came from a cache.</param>
-  WorkItemRequest<TWorkItem> GetNextWorkItem();
+  WorkItemRequest<TWorkItem> GetNextWorkItem(bool useWorkRatedDelay);
   void AddWorkItem(TWorkItem item);
   void ClearWorkRateDelay();
   void SetComplete(TWorkItem item, Exception? ex = null);
@@ -197,7 +197,7 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
   }
 
   // --------------------------------------------------------------------------------------------------------------------------
-  public virtual WorkItemRequest<TWorkItem> GetNextWorkItem()
+  public virtual WorkItemRequest<TWorkItem> GetNextWorkItem(bool useWorkRatedDelay)
   {
     // NOTE: RESEARCH:
     // I see a way that we can accidentally report invalid number of work items or accidentally drop
@@ -225,7 +225,7 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
       {
         // NOTE: We might want to have some kind of rate-limiting workload manager, etc.
         // vs. building this directly into the workload manager.
-        ExecuteWorkRateDelay();
+        if (useWorkRatedDelay) { ExecuteWorkRateDelay(); }
 
         int useIndex = 0;
         if (this.RandomizeOrder)

@@ -3,6 +3,14 @@ using System.Diagnostics;
 namespace drewCo.Work;
 
 // ============================================================================================================================
+public interface IWorkItem
+{
+  /// <summary>Is the result of this work item from a cache?</summary>
+  /// <remarks>This information is typically used to bypass work rate limits.</remarks>
+  bool FromCache { get; }
+}
+
+// ============================================================================================================================
 public interface IWorkloadRunner<TWorkItem>
 {
   void DoWork(Action<TWorkItem, IWorkloadManager<TWorkItem>> workAction, Action<TWorkItem, Exception> exHandler, bool cancelOnException);
@@ -15,6 +23,7 @@ public interface IWorkloadRunner<TWorkItem>
 
 // ============================================================================================================================
 public abstract class WorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
+  where TWorkItem : IWorkItem
 {
   protected CancellationTokenSource CancelSource = null!;
   protected IWorkloadManager<TWorkItem> WorkMgr = null!;
