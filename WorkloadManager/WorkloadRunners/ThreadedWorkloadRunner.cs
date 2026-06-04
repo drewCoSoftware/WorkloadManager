@@ -31,9 +31,10 @@ public class ThreadedWorkloadRunner<TWorkItem> : WorkloadRunner<TWorkItem>
     List<Task> tasks = new List<Task>();
     for (int i = 0; i < MaxThreads; i++)
     {
+      int workerId = i;
       var t = Task.Factory.StartNew(() =>
       {
-        int workerId = i;
+        // int workerId = i;
 
         while (true)
         {
