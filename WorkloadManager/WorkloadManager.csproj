@@ -15,7 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="drewCo.Tools" Version="1.4.2.4" />
+    <PackageReference Include="drewCo.Tools" Version="1.5.1.1" />
   </ItemGroup>
 
 </Project>
