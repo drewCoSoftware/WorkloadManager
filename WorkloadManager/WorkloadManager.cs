@@ -254,37 +254,11 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
 
       if (curRate > useWorkRate)
       {
-        //lock (WaitLock)
-        //{
           var waitTime = (NonCachedItemsCompleted / useWorkRate) - workTime;
           Thread.Sleep((int)(waitTime * 1000));
-        //}
       }
-
-
-
-      //double frac = RandomTools.RNG.NextDouble();
-      //double useWorkRate = (frac * (MaxWorkRate - MinWorkRate)) + MinWorkRate;
-      //double delay = 1.0d / useWorkRate;
-
-      //TimeSpan curWait = DateTime.Now - LastWorkItemDispatchTime;
-      //if (curWait.TotalSeconds < delay)
-      //{
-      //  int waitFor = (int)((delay - curWait.TotalSeconds) * 1000);
-      //  if (waitFor > 0)
-      //  {
-      //    Thread.Sleep(waitFor);
-      //  }
-      //}
     }
   }
-
-
-  //// --------------------------------------------------------------------------------------------------------------------------
-  //public void ClearWorkRateDelay()
-  //{
-  //  LastWorkItemDispatchTime = DateTime.MinValue;
-  //}
 
 }
 
