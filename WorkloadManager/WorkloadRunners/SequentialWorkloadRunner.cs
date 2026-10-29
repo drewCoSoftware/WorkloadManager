@@ -28,6 +28,8 @@ public class SequentialWorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
     IsRunning = true;
     bool skipWait = false;
 
+    WorkMgr.Start();
+
     while (!CancelWork)
     {
       var req = WorkMgr.GetNextWorkItem(!skipWait);
@@ -44,13 +46,13 @@ public class SequentialWorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
       {
         workAction(req.WorkItem, WorkMgr);
         skipWait = req.WorkItem.FromCache;
-        WorkMgr.SetComplete(req.WorkItem);
+        WorkMgr.SetComplete(req.WorkItem, req.WorkItem.FromCache);
       }
       
       catch (Exception ex)
       {
         exHandler(req.WorkItem, ex);
-        WorkMgr.SetComplete(req.WorkItem, ex);
+        WorkMgr.SetComplete(req.WorkItem, false, ex);
 
         if (cancelOnException)
         {

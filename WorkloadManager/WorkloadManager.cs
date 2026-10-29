@@ -9,105 +9,6 @@ namespace drewCo.Work;
 // ============================================================================================================================
 public record WorkItemRequest<TWorkItem>(bool IsWorkAvailable, TWorkItem? WorkItem);
 
-//// ============================================================================================================================
-//public class PriorityWorkItem<TWorkItem>
-//{
-//  /// <summary>
-//  /// Items with lower priorioty numbers are executed first.
-//  /// </summary>
-//  public int Priority { get; private set; } = 10;
-//  public TWorkItem WorkItem { get; private set; } = default!;
-
-//  // --------------------------------------------------------------------------------------------------------------------------
-//  public PriorityWorkItem(int priority_, TWorkItem workItem_)
-//  {
-//    Priority = priority_;
-//    WorkItem = workItem_;
-//  }
-//}
-
-//// ============================================================================================================================
-//internal class PriorityGroup<TWorkItem>
-//{
-//  public int Priority { get; private set; }
-//  public List<PriorityWorkItem<TWorkItem>> AllItems { get; private set; } = new List<PriorityWorkItem<TWorkItem>>();
-//}
-
-//// ============================================================================================================================
-//public class PrioritizedWorkloadManager<TWorkItem> : WorkloadManager<PriorityWorkItem<TWorkItem>>
-//{
-//  // The key is the priority number.
-//  private Dictionary<int, PriorityGroup<TWorkItem>> PriorityGroups { get; set; } = new Dictionary<int, PriorityGroup<TWorkItem>>();
-//  private List<int> PriorityNumers = new List<int>();
-//  private object GroupLock = new object();
-
-//  // --------------------------------------------------------------------------------------------------------------------------
-//  public PrioritizedWorkloadManager()
-//    : base()
-//  { }
-
-//  // --------------------------------------------------------------------------------------------------------------------------
-//  public PrioritizedWorkloadManager(IList<PriorityWorkItem<TWorkItem>> workItems, int maxItems = -1)
-//  : base(workItems, maxItems)
-//  { }
-
-
-//  // --------------------------------------------------------------------------------------------------------------------------
-//  public override WorkItemRequest<PriorityWorkItem<TWorkItem>> GetNextWorkItem()
-//  {
-//    int groupLen = PriorityNumers.Count;
-
-//    // This is a very simple way to do it.  It does not take any kind of possible delay into account.
-//    for (int i = 0; i < groupLen; i++)
-//    {
-//      var pGroup = PriorityGroups[PriorityNumers[i]];
-//      if (pGroup.AllItems.Count > 0)
-//      {
-//        PriorityWorkItem<TWorkItem> res = pGroup.AllItems[0];
-//        pGroup.AllItems.Remove(res);
-
-//        return new WorkItemRequest<PriorityWorkItem<TWorkItem>>(true, res);
-//      }
-//    }
-
-//    return new WorkItemRequest<PriorityWorkItem<TWorkItem>>(false, default);
-//  }
-
-//  // --------------------------------------------------------------------------------------------------------------------------
-//  protected override void InitWorkItems(IList<PriorityWorkItem<TWorkItem>> workItems)
-//  {
-//    foreach (var item in workItems)
-//    {
-//      AddWorkItem(item);
-//    }
-//  }
-
-//  // --------------------------------------------------------------------------------------------------------------------------
-//  public void AddWorkItem(int priority, TWorkItem item)
-//  {
-//    var pwi = new PriorityWorkItem<TWorkItem>(priority, item);
-//    AddWorkItem(pwi);
-//  }
-//  // --------------------------------------------------------------------------------------------------------------------------
-//  public override void AddWorkItem(PriorityWorkItem<TWorkItem> item)
-//  {
-//    lock (GroupLock)
-//    {
-//      if (!PriorityGroups.TryGetValue(item.Priority, out var pGroup))
-//      {
-//        pGroup = new PriorityGroup<TWorkItem>();
-//        PriorityGroups.Add(item.Priority, pGroup);
-
-//        PriorityNumers.Add(item.Priority);
-//        PriorityNumers.Sort();
-//      }
-
-//      pGroup.AllItems.Add(item);
-//    }
-//  }
-
-//}
-
 // ============================================================================================================================
 public interface IWorkloadData
 {
@@ -122,8 +23,13 @@ public interface IWorkloadManager<TWorkItem> : IWorkloadData
   /// <param name="ignoreWorkRateDelay">Set to true to ignore workrate delays.  This is typically used to bypass those delays when the previous work item came from a cache.</param>
   WorkItemRequest<TWorkItem> GetNextWorkItem(bool useWorkRatedDelay);
   void AddWorkItem(TWorkItem item);
-  void ClearWorkRateDelay();
-  void SetComplete(TWorkItem item, Exception? ex = null);
+  //  void ClearWorkRateDelay();
+  void SetComplete(TWorkItem item, bool fromCache, Exception? ex = null);
+
+  void Start();
+  void Stop();
+  TimeSpan Runtime { get; }
+  bool IsRunning { get; }
 
   bool HasActiveItems { get; }
 }
@@ -183,6 +89,19 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
     }
   }
 
+  /// <summary>
+  /// The total number of items that have been processed.
+  /// </summary>
+  private int TotalItemsCompleted = 0;
+
+  /// <summary>
+  /// The number of items we have actually done work on.
+  /// Cached items don't count towards the work rate limits!
+  /// </summary>
+  private int NonCachedItemsCompleted = 0;
+
+  private Stopwatch _Clock = null!;
+
   private DateTimeOffset LastWorkItemDispatchTime = DateTimeOffset.MinValue;
 
   // --------------------------------------------------------------------------------------------------------------------------
@@ -196,9 +115,42 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
     TotalWorkItems = (MaxWorkItems != UNLIMITED_WORK_ITEMS) ? MaxWorkItems : RemainingWorkItems.Count;
   }
 
+
+  public bool IsRunning { get; private set; }
+
+  public TimeSpan Runtime
+  {
+    get
+    {
+      Debug.Assert(IsRunning, "Start() not called!");
+      return _Clock.Elapsed;
+    }
+  }
+
+  // --------------------------------------------------------------------------------------------------------------------------
+  public void Start()
+  {
+    Debug.Assert(!IsRunning);
+    TotalItemsCompleted = 0;
+    NonCachedItemsCompleted = 0;
+    IsRunning = true;
+    _Clock = Stopwatch.StartNew();
+  }
+
+  // --------------------------------------------------------------------------------------------------------------------------
+  public void Stop()
+  {
+    Debug.Assert(IsRunning);
+    _Clock.Stop();
+  }
+
+
+
   // --------------------------------------------------------------------------------------------------------------------------
   public virtual WorkItemRequest<TWorkItem> GetNextWorkItem(bool useWorkRatedDelay)
   {
+    // Debug.Assert(_Clock != null, "Start() not called!");
+
     // NOTE: RESEARCH:
     // I see a way that we can accidentally report invalid number of work items or accidentally drop
     // workers...  Consider this, we have a work function that can add more work items as they complete,
@@ -252,17 +204,38 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
   }
 
   // --------------------------------------------------------------------------------------------------------------------------
-  public void SetComplete(TWorkItem item, Exception? ex = null)
+  public virtual void AddWorkItem(TWorkItem item)
+  {
+    lock (DataLock)
+    {
+      this.RemainingWorkItems.Add(item);
+      this.TotalWorkItems += 1;
+    }
+  }
+
+  // --------------------------------------------------------------------------------------------------------------------------
+  public void SetComplete(TWorkItem item, bool fromCache, Exception? ex = null)
   {
     lock (DataLock)
     {
       Debug.Assert(ActiveWorkItems.Contains(item), "This work item does not belong to this manager, or has already been removed!");
       ActiveWorkItems.Remove(item);
-      FailedItems.Add(new FailedWorkItem(item, ex));
+
+      ++TotalItemsCompleted;
+      if (!fromCache)
+      {
+        ++NonCachedItemsCompleted;
+      }
+
+      if (ex != null)
+      {
+        FailedItems.Add(new FailedWorkItem(item, ex));
+      }
     }
   }
 
   // --------------------------------------------------------------------------------------------------------------------------
+  private object WaitLock = new object();
   private void ExecuteWorkRateDelay()
   {
     // NOTE: This doesn't really work as any attempts to clear the wait externally will cause all
@@ -273,39 +246,45 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
     // Perhaps some kind of internal loop for finer-grained sleep?
     if (MaxWorkRate != UNLIMITED_WORK_RATE)
     {
-      // NOTE: RandomTools needs an overload for 'double'!!!!!
+      var workTime = _Clock.Elapsed.TotalSeconds;
+      var curRate = NonCachedItemsCompleted / workTime;
+
       double frac = RandomTools.RNG.NextDouble();
       double useWorkRate = (frac * (MaxWorkRate - MinWorkRate)) + MinWorkRate;
-      double delay = 1.0d / useWorkRate;
 
-      TimeSpan curWait = DateTime.Now - LastWorkItemDispatchTime;
-      if (curWait.TotalSeconds < delay)
+      if (curRate > useWorkRate)
       {
-        int waitFor = (int)((delay - curWait.TotalSeconds) * 1000);
-        if (waitFor > 0)
-        {
-          Thread.Sleep(waitFor);
-        }
+        //lock (WaitLock)
+        //{
+          var waitTime = (NonCachedItemsCompleted / useWorkRate) - workTime;
+          Thread.Sleep((int)(waitTime * 1000));
+        //}
       }
+
+
+
+      //double frac = RandomTools.RNG.NextDouble();
+      //double useWorkRate = (frac * (MaxWorkRate - MinWorkRate)) + MinWorkRate;
+      //double delay = 1.0d / useWorkRate;
+
+      //TimeSpan curWait = DateTime.Now - LastWorkItemDispatchTime;
+      //if (curWait.TotalSeconds < delay)
+      //{
+      //  int waitFor = (int)((delay - curWait.TotalSeconds) * 1000);
+      //  if (waitFor > 0)
+      //  {
+      //    Thread.Sleep(waitFor);
+      //  }
+      //}
     }
   }
 
-  // --------------------------------------------------------------------------------------------------------------------------
-  public virtual void AddWorkItem(TWorkItem item)
-  {
-    lock (DataLock)
-    {
-      this.RemainingWorkItems.Add(item);
-      this.TotalWorkItems += 1;
-    }
-  }
 
-
-  // --------------------------------------------------------------------------------------------------------------------------
-  public void ClearWorkRateDelay()
-  {
-    LastWorkItemDispatchTime = DateTime.MinValue;
-  }
+  //// --------------------------------------------------------------------------------------------------------------------------
+  //public void ClearWorkRateDelay()
+  //{
+  //  LastWorkItemDispatchTime = DateTime.MinValue;
+  //}
 
 }
 

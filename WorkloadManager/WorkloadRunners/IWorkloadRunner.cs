@@ -28,7 +28,7 @@ public abstract class WorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
   protected CancellationTokenSource CancelSource = null!;
   protected IWorkloadManager<TWorkItem> WorkMgr = null!;
 
-  private Stopwatch RuntimeClock = null!;
+  protected Stopwatch RuntimeClock = null!;
   private TimeSpan _RunTime = TimeSpan.Zero;
   public TimeSpan RunTime
   {
@@ -58,6 +58,7 @@ public abstract class WorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
   protected virtual void BeginWork()
   {
     RuntimeClock = Stopwatch.StartNew();
+    WorkMgr.Start();
     IsRunning = true;
     IsComplete = false;
     WasCancelled = false;
@@ -67,6 +68,7 @@ public abstract class WorkloadRunner<TWorkItem> : IWorkloadRunner<TWorkItem>
   protected virtual void EndWork(bool cancelled)
   {
     _RunTime = RuntimeClock.Elapsed;
+    WorkMgr.Stop();
     IsComplete = true;
     WasCancelled = cancelled;
     IsRunning = false;

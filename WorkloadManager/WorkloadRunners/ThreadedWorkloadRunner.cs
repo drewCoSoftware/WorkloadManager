@@ -34,7 +34,6 @@ public class ThreadedWorkloadRunner<TWorkItem> : WorkloadRunner<TWorkItem>
       int workerId = i;
       var t = Task.Factory.StartNew(() =>
       {
-        // int workerId = i;
 
         while (true)
         {
@@ -65,14 +64,13 @@ public class ThreadedWorkloadRunner<TWorkItem> : WorkloadRunner<TWorkItem>
             try
             {
               workAction.Invoke(req.WorkItem, WorkMgr);
-              skipRateDelay = req.WorkItem.FromCache;
 
-              WorkMgr.SetComplete(req.WorkItem);
+              WorkMgr.SetComplete(req.WorkItem, req.WorkItem.FromCache);
             }
             catch (Exception ex)
             {
               exHandler(req.WorkItem, ex);
-              WorkMgr.SetComplete(req.WorkItem, ex);
+              WorkMgr.SetComplete(req.WorkItem, false, ex);
 
               if (cancelOnException)
               {
