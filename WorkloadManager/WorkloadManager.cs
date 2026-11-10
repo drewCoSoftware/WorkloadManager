@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using drewCo.Tools;
 
@@ -67,11 +68,20 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
     }
   }
 
+  private double MaxWorkRatePerSecond = UNLIMITED_WORK_RATE;
+  private double MinWorkRatePerSecond = UNLIMITED_WORK_RATE;
+
   /// <summary>
-  /// Max number of work items that can be dispatched per second.
+  /// Maximum work rate, for example "2400/s", "2400/m", or "2400/h".
+  /// Use "-1" for unlimited work.
   /// </summary>
-  public double MaxWorkRate { get; set; } = UNLIMITED_WORK_RATE;
-  public double MinWorkRate { get; set; } = UNLIMITED_WORK_RATE;
+  public string MaxWorkRate { get; set; } = "-1";
+
+  /// <summary>
+  /// Minimum work rate using the same format as MaxWorkRate.
+  /// "-1" uses MaxWorkRate. Otherwise, a random rate between the two is used.
+  /// </summary>
+  public string MinWorkRate { get; set; } = "-1";
   public int MaxWorkItems { get; private set; } = UNLIMITED_WORK_ITEMS;
   private int WorkItemsDispatched = 0;
 
@@ -131,6 +141,9 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
   public void Start()
   {
     Debug.Assert(!IsRunning);
+    MaxWorkRatePerSecond = ParseWorkRate(MaxWorkRate, nameof(MaxWorkRate));
+    MinWorkRatePerSecond = ParseWorkRate(MinWorkRate, nameof(MinWorkRate));
+    MinWorkRatePerSecond = ResolveMinimumWorkRate();
     TotalItemsCompleted = 0;
     NonCachedItemsCompleted = 0;
     IsRunning = true;
@@ -235,7 +248,40 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
   }
 
   // --------------------------------------------------------------------------------------------------------------------------
-  private object WaitLock = new object();
+  private static double ParseWorkRate(string rate, string optionName)
+  {
+    if (rate?.Trim() == "-1") { return UNLIMITED_WORK_RATE; }
+
+    string[] parts = rate?.Split('/', StringSplitOptions.TrimEntries) ?? Array.Empty<string>();
+    if (parts.Length == 2 &&
+        double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double count) &&
+        double.IsFinite(count) && count > 0)
+    {
+      double seconds = parts[1].ToLowerInvariant() switch
+      {
+        "s" => 1,
+        "m" => 60,
+        "h" => 3600,
+        _ => 0
+      };
+      if (seconds > 0 && count / seconds > 0) { return count / seconds; }
+    }
+
+    throw new ArgumentException($"{optionName} must be a positive rate such as '2400/s', '2400/m', or '2400/h', or '-1'.", optionName);
+  }
+
+  // --------------------------------------------------------------------------------------------------------------------------
+  private double ResolveMinimumWorkRate()
+  {
+    double minRate = MinWorkRatePerSecond == UNLIMITED_WORK_RATE ? MaxWorkRatePerSecond : MinWorkRatePerSecond;
+    if (MaxWorkRatePerSecond != UNLIMITED_WORK_RATE && minRate > MaxWorkRatePerSecond)
+    {
+      throw new ArgumentException("MinWorkRate must not exceed MaxWorkRate.", nameof(MinWorkRate));
+    }
+    return minRate;
+  }
+
+  // --------------------------------------------------------------------------------------------------------------------------
   private void ExecuteWorkRateDelay()
   {
     // NOTE: This doesn't really work as any attempts to clear the wait externally will cause all
@@ -244,13 +290,13 @@ public class WorkloadManager<TWorkItem> : IWorkloadManager<TWorkItem>
     // --> Maybe workload manager has a concept of using cached data in general?  I kind of don't
     // like that since it piles responsibility on this class....
     // Perhaps some kind of internal loop for finer-grained sleep?
-    if (MaxWorkRate != UNLIMITED_WORK_RATE)
+    if (MaxWorkRatePerSecond != UNLIMITED_WORK_RATE)
     {
       var workTime = _Clock.Elapsed.TotalSeconds;
       var curRate = NonCachedItemsCompleted / workTime;
 
       double frac = RandomTools.RNG.NextDouble();
-      double useWorkRate = (frac * (MaxWorkRate - MinWorkRate)) + MinWorkRate;
+      double useWorkRate = (frac * (MaxWorkRatePerSecond - MinWorkRatePerSecond)) + MinWorkRatePerSecond;
 
       if (curRate > useWorkRate)
       {
